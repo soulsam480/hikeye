@@ -1,7 +1,7 @@
 # Python parity report
 
 **Date:** 2026-11-02
-**App:** `python/` (FastAPI), Node app retained at the repo root.
+**App:** repo root (FastAPI).
 
 ## Verified
 

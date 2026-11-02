@@ -41,9 +41,11 @@ def test_health_status_and_ui_contract(tmp_path: Path) -> None:
 
         index = client.get("/")
         assert index.status_code == 200
-        assert "eventList" in index.text
-        assert "visionChip" in index.text
-        assert "/api/events" in client.get("/app.js").text
+        assert "Vision events" in index.text
+        assert "Test" in index.text
+        assert "/stream.mjpeg" in index.text
+        assert client.get("/static/styles.css").status_code == 200
+        assert client.get("/app.js").status_code == 404
 
 
 def test_basic_auth_protects_every_route(tmp_path: Path) -> None:

@@ -1,40 +1,42 @@
 # Netra
 
-> **Python rewrite (active app):** `python/` contains the FastAPI backend with
-> Hikvision decryption and vision-language events. See
-> [python/README.md](python/README.md). The original Node implementation is
-> still available via `mise run node:start`.
-
-A local-first CCTV dashboard for Hikvision DVRs/NVRs, including **encrypted
-Hik-Connect streams**. One Node process, no build step, no cloud, no accounts.
-Credentials stay on the server and are never sent to the browser.
+Local-first CCTV dashboard for Hikvision DVRs/NVRs, with **encrypted RTSP
+decryption** and **vision-language events** from an OpenAI-compatible endpoint.
+No cloud, no hosted inference, no accounts.
 
 ## Features
 
-- **Multi-camera selector** — all channels, one running at a time
-- **Decrypts Hikvision "video encryption"** in real time (AES-128, no SDK)
-- **Reads the verification code from the DVR** automatically (admin account)
-- **Live view** over MJPEG (no plugins, works in every browser)
-- **Snapshot** button to download a still
-- **One-click recording** to MP4, per camera
-- **Playback** in the browser with HTTP range support
-- **Health panel**: state, resolution, FPS, bitrate, decrypted NALs, reconnects
-- Automatic reconnect, stall watchdog, and 401 lockout protection
-- Optional password protection
+- **7-camera selector** — one live stream at a time, all channels configured
+- **Decrypts Hikvision stream encryption** in real time (AES-128, H.264)
+- **Reads the verification code from the DVR** with an admin account
+- **Live MJPEG**, snapshots, per-camera MP4 recording, browser playback
+- **Vision events** — motion-gated frames sent to a local VLM endpoint; people,
+  vehicles, animals, descriptions, confidence, snapshots
+- **SQLite event store** with cooldowns/dedupe and retention
+- FastAPI + uvicorn, typed Python 3.13, `uv`, `ruff`, pytest
 
 ## Requirements
 
-- Node.js 20+
-- `ffmpeg` on your PATH (`brew install ffmpeg`)
+- Python 3.13 (mise pins it in the repo)
+- [uv](https://docs.astral.sh/uv/)
+- `ffmpeg` on `PATH`
 - A Hikvision / HiLook / EZVIZ DVR or NVR with an **admin** account
+- An OpenAI-compatible vision endpoint (vLLM, llama.cpp server, LM Studio, …)
+  for real events; `mock` works without one
 
-## Setup
+## Install
+
+```bash
+uv sync --extra dev
+```
+
+The app reads the repository-root `.env` by default. Copy the example if needed:
 
 ```bash
 cp .env.example .env
 ```
 
-Fill in the DVR and cameras:
+## Configure
 
 ```dotenv
 STREAM_IP=192.168.0.100
@@ -44,154 +46,130 @@ STREAM_PASS=your-password
 CAMERAS=1:Front Door,2:Backyard,3:Garage,4:Driveway,5:Side,6:Porch,7:Office
 
 STREAM_MODE=decrypt
+STREAM_STREAM=sub
 ```
 
-Verify the connection:
+Then verify the DVR, credentials, verification code and first camera:
 
 ```bash
-mise run check     # or: npm run check
+uv run netra check
 ```
 
-Start it:
+Run the dashboard:
 
 ```bash
-mise run start     # or: npm start
+uv run netra serve
+# http://localhost:8080
 ```
 
-Open <http://localhost:8080>.
+Or from the repo root:
 
-> The verification code is read from the DVR's ISAPI endpoint
-> (`/ISAPI/System/Network/EZVIZ`) using the admin account. If that fails, put it
-> in `.env` as `STREAM_SECRET_KEY`.
+```bash
+mise run start     # Python app
+mise run check
+mise run test
+mise run lint
+```
 
 ## Capture modes
 
 | `STREAM_MODE` | Use when | How |
 | --- | --- | --- |
-| `decrypt` | Encryption is on (Hik-Connect / HiLook) | RTSP + AES-128 decryption |
-| `rtsp` | Encryption is off | Plain ffmpeg RTSP |
-| `snapshot` | Last resort | Polls the ISAPI JPEG endpoint at `SNAPSHOT_FPS` |
+| `decrypt` | Hik-Connect encryption is on | RTSP + AES-128 decryption |
+| `rtsp` | Encryption is off | Plain RTSP |
+| `snapshot` | Last resort | ISAPI JPEG polling |
 
-### Encrypted streams (the interesting part)
-
-Hikvision marks encrypted NAL units with an RTP header extension (`0x4000`).
-Each one is laid out as:
-
-```
-[original NAL header] + AES-128-ECB(original NAL, first 4 KB) + plaintext rest
-```
-
-The key is the device verification code, zero-padded to 16 bytes. Netra
-reassembles the NALs, decrypts the flagged ones, and pipes the result to ffmpeg.
-The first decrypted byte is compared with the clear NAL header as a sanity
-check, so unencrypted streams are never touched.
-
-This implementation is ported from
+Encrypted NALs are flagged by RTP header extension `0x4000` and laid out as
+`[NAL header] + AES-128-ECB(first 4 KB) + plaintext rest`. The key is the device
+verification code, zero-padded to 16 bytes. The decryption port is based on
 [homebridge-hikvision-dvr](https://github.com/matthewdeaves/homebridge-hikvision-dvr)
-(MIT). Thanks to that project for documenting the format.
+(MIT).
 
-**H.264 only.** Hikvision's H.265 encryption uses a different layout. Set each
-camera's **sub stream** to H.264 in the DVR (Configuration → Video → Sub
-Stream → Video Encoding → H.264), or via ISAPI. All seven sub streams on the
-tested DS-7108HGHI-M1/T were switched this way.
+**H.264 only.** Hikvision H.265 uses a different layout. Set each sub stream to
+H.264 (DVR UI or `uv run netra codecs --set-h264`).
 
-## Viewing from your phone
+## Vision
 
-By default the server only listens on `127.0.0.1`. To open it on your LAN:
+The model is not loaded by this process. It runs wherever you like and exposes
+an OpenAI-compatible API. The app sends a single frame as a base64 `image_url`
+data URL and expects a JSON object in return.
 
 ```dotenv
-HOST=0.0.0.0
-DASHBOARD_PASSWORD=something-long
+VISION_BACKEND=openai
+VISION_BASE_URL=http://127.0.0.1:8000/v1
+VISION_MODEL=lfm2.5-vl-3b
+# VISION_API_KEY=
+VISION_INTERVAL=2
+VISION_COOLDOWN=20
 ```
 
-Restart and browse to `http://<your-computer-ip>:8080`. The browser asks for
-`DASHBOARD_USER` (default `admin`) and that password. Do not expose this to the
-internet without a reverse proxy and TLS.
+Any endpoint that supports `POST /v1/chat/completions` with image content works:
+vLLM, llama.cpp's server, LM Studio, or a gateway in front of Liquid AI's latest
+`LFM2.5-VL-3B`.
 
-## Configuration
+Without an endpoint, keep `VISION_BACKEND=mock` (the default) to exercise the
+pipeline; it returns a deterministic `person` event.
 
-| Variable | Default | Purpose |
-| --- | --- | --- |
-| `STREAM_IP` | — | DVR/camera IP (required) |
-| `STREAM_USER` | — | Username (admin for automatic code reading) |
-| `STREAM_PASS` | — | Password (special characters are fine) |
-| `CAMERAS` | — | `channel:name` list, e.g. `1:Front,2:Back` |
-| `STREAM_MODE` | `rtsp` | `decrypt`, `rtsp`, or `snapshot` |
-| `STREAM_SECRET_KEY` | read from DVR | Verification code fallback |
-| `STREAM_URL` | — | Full RTSP URL; overrides the derived one (single camera) |
-| `STREAM_PATH` | `/Streaming/Channels/102` | RTSP path (single camera) |
-| `STREAM_PORT` | `554` | RTSP port |
-| `STREAM_TRANSPORT` | `tcp` | `tcp` or `udp` |
-| `STREAM_FPS` | `10` | Browser/recording frame rate |
-| `STREAM_QUALITY` | `5` | MJPEG quality (2 = best, 31 = smallest) |
-| `SNAPSHOT_FPS` | `2` | Poll rate in snapshot mode |
-| `SNAPSHOT_URL` | — | Override the snapshot URL (single camera) |
-| `CAMERA_NAME` | `Front Camera` | Name when `CAMERAS` is unset |
-| `PORT` | `8080` | Dashboard port |
-| `HOST` | `127.0.0.1` | Bind address |
-| `DASHBOARD_USER` | `admin` | Basic-auth username |
-| `DASHBOARD_PASSWORD` | empty | Basic-auth password; empty disables auth |
-| `RECORDINGS_DIR` | `recordings` | Recordings root (one folder per camera) |
-| `FFMPEG_PATH` | `ffmpeg` | Path to ffmpeg |
+How events are produced:
 
-## How it works
+1. Sample the active camera every `VISION_INTERVAL` seconds.
+2. Cheap motion gate (64×48 grayscale diff) — no motion, no model call.
+3. One VLM call at a time; results are parsed and validated.
+4. `none` is discarded; repeats within `VISION_COOLDOWN` update `last_seen`.
+5. Snapshot + row stored; the UI polls `/api/events`.
 
-```
-RTSP/RTP ──reassemble──> NALs ──AES-128 decrypt──> Annex-B ──ffmpeg──> JPEG ──> browser
-                                                              └─ ffmpeg ─> recordings/<camera>/*.mp4
-```
-
-- One RTSP session per active camera. Frames are fanned out to every viewer;
-  slow clients drop frames instead of buffering.
-- Recording uses the throttled frame feed, so playback runs at real speed.
-- No frames for 20 seconds restarts the capture.
-- On `401/403` it retries slowly, then stops after 3 failures to avoid locking
-  the camera account.
+Events live in SQLite (`data/events.db`), snapshots in `data/events/<camera>/`.
 
 ## API
 
 | Method | Path | Description |
 | --- | --- | --- |
-| `GET` | `/api/status` | Active camera + recorder state |
+| `GET` | `/api/status` | Camera, recorder, vision state |
 | `GET` | `/api/cameras` | Camera list |
 | `POST` | `/api/cameras/:id/activate` | Switch camera |
-| `GET` | `/api/events` | Server-sent status events |
 | `GET` | `/api/snapshot.jpg?camera=1` | Single JPEG |
 | `GET` | `/stream.mjpeg?camera=1` | Live MJPEG |
 | `GET` | `/api/recordings?camera=1` | List recordings |
 | `POST` | `/api/recordings/start?camera=1` | Start recording |
 | `POST` | `/api/recordings/stop?camera=1` | Stop recording |
-| `GET` | `/api/recordings/:name?camera=1` | Play/download (range supported) |
+| `GET` | `/api/recordings/:name?camera=1` | Play/download |
 | `DELETE` | `/api/recordings/:name?camera=1` | Delete |
+| `GET` | `/api/events?camera=1&limit=24` | Vision events |
+| `GET` | `/api/events/:id/snapshot` | Event JPEG |
 | `GET` | `/healthz` | Health check |
 
-## Troubleshooting
-
-**`401 Unauthorized`** — wrong credentials, RTSP auth disabled, or a temporary
-lockout after repeated failures. Confirm the login in the DVR web UI, wait, then
-run `mise run check`.
-
-**Encrypted stream but `decryptedNals: 0`** — the verification code is wrong.
-Netra reads it from the DVR automatically; make sure the account is admin. The
-health panel shows `decrypted / flagged NALs`.
-
-**`PPS id out of range` / HEVC errors** — that stream is H.265. Switch its sub
-stream to H.264 (the decryptor supports H.264).
-
-**High latency** — use the sub stream (`102`), keep `STREAM_FPS` at 10–15.
-
-**Recordings fill the disk** — Netra does not prune automatically. Point
-`RECORDINGS_DIR` at a large disk and delete from the dashboard.
-
-## Development
+## Tests and lint
 
 ```bash
-mise run test    # unit tests
-mise run dev     # restart on file changes
+uv run pytest
+uv run ruff check netra tests
+uv run ruff format --check netra tests
 ```
 
-## License
+Unit tests need no DVR and no model. The live smoke test is `netra check`.
 
-MIT. The RTSP client and decryptor are ported from
-[homebridge-hikvision-dvr](https://github.com/matthewdeaves/homebridge-hikvision-dvr)
-(MIT).
+## Layout
+
+```
+netra/
+  config.py       .env + camera definitions
+  rtsp.py         RTSP digest, RTP, NAL reassembly
+  crypto.py       AES-128 NAL decryptor
+  camera.py       RTSP -> decrypt -> ffmpeg -> JPEG frames
+  recorder.py     decrypted H.264 -> MP4 (-c copy)
+  hub.py          camera selector + recorders
+  isapi.py        verification code, channel codec
+  events.py       SQLite event store + motion detector
+  engine.py       motion gate -> VLM -> event
+  vision/         mock + OpenAI-compatible backends, prompt/JSON parser
+  server.py       FastAPI routes, MJPEG, auth, static UI
+  cli.py          serve / check / codecs
+  static/         stylesheet and icon
+```
+
+## Privacy
+
+Everything runs on your machine except the vision request, which goes to the
+`VISION_BASE_URL` you configure. Snapshots and events stay local. Bind to
+`127.0.0.1` by default; set `HOST=0.0.0.0` and `DASHBOARD_PASSWORD` only on a
+trusted LAN. Do not expose this to the internet without TLS and a proxy.

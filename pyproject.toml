@@ -43,5 +43,8 @@ target-version = "py313"
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "SIM", "RUF"]
 
+[tool.ruff.lint.per-file-ignores]
+"netra/ui.py" = ["E501", "RUF001"]
+
 [tool.ruff.format]
 quote-style = "double"

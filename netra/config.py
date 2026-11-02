@@ -233,7 +233,7 @@ class Settings:
 
 def _default_env_file() -> Path:
     # python/netra/config.py -> python/netra -> python -> repo root
-    return Path(__file__).resolve().parents[2] / ".env"
+    return Path(__file__).resolve().parents[1] / ".env"
 
 
 def _build_rtsp_url(host: str, user: str, password: str, port: int, stream_path: str) -> str:

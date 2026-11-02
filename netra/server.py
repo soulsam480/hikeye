@@ -5,13 +5,13 @@ import base64
 import json
 import secrets
 from collections.abc import AsyncIterator
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, suppress
 from pathlib import Path
 from typing import Any
 from urllib.parse import urlsplit
 
 from fastapi import FastAPI, HTTPException, Query, Request, Response
-from fastapi.responses import FileResponse, StreamingResponse
+from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
 from .config import Settings
@@ -19,6 +19,7 @@ from .engine import EventEngine, create_backend
 from .events import EventStore
 from .hub import CameraHub, UnknownCameraError
 from .isapi import IsapiClient
+from .ui import render_dashboard
 
 STATIC_DIR = Path(__file__).parent / "static"
 BOUNDARY = "netra-frame"
@@ -182,7 +183,7 @@ def create_app(settings: Settings) -> FastAPI:
         path = recorder.resolve(name)
         if path is None or not path.is_file():
             raise HTTPException(status_code=404, detail="Recording not found")
-        return FileResponse(path, media_type="video/mp4", filename=name)
+        return FileResponse(path, media_type="video/mp4")
 
     @app.delete("/api/recordings/{name}")
     async def delete_recording(
@@ -210,8 +211,44 @@ def create_app(settings: Settings) -> FastAPI:
             raise HTTPException(status_code=404, detail="Snapshot not found")
         return FileResponse(path, media_type="image/jpeg")
 
+    @app.get("/", response_class=HTMLResponse)
+    async def dashboard(camera: str | None = Query(default=None)) -> HTMLResponse:
+        if camera and camera != hub.active_id:
+            try:
+                await asyncio.to_thread(hub.activate, camera)
+            except UnknownCameraError as error:
+                raise HTTPException(status_code=404, detail="Unknown camera") from error
+        page = await asyncio.to_thread(render_dashboard, settings, hub, store, engine)
+        return HTMLResponse(page)
+
+    @app.post("/ui/record/start")
+    async def ui_record_start(camera: str | None = Query(default=None)) -> RedirectResponse:
+        camera_id = camera or hub.active_id
+        try:
+            await asyncio.to_thread(hub.activate, camera_id)
+            await asyncio.to_thread(hub.recorder_for(camera_id).start)
+        except (UnknownCameraError, RuntimeError):
+            pass
+        return RedirectResponse(url=f"/?camera={camera_id}", status_code=303)
+
+    @app.post("/ui/record/stop")
+    async def ui_record_stop(camera: str | None = Query(default=None)) -> RedirectResponse:
+        camera_id = camera or hub.active_id
+        with suppress(UnknownCameraError):
+            await asyncio.to_thread(hub.recorder_for(camera_id).stop)
+        return RedirectResponse(url=f"/?camera={camera_id}", status_code=303)
+
+    @app.post("/ui/recordings/{name}/delete")
+    async def ui_delete_recording(
+        name: str, camera: str | None = Query(default=None)
+    ) -> RedirectResponse:
+        camera_id = camera or hub.active_id
+        with suppress(UnknownCameraError, ValueError, FileNotFoundError):
+            await asyncio.to_thread(hub.recorder_for(camera_id).remove, name)
+        return RedirectResponse(url=f"/?camera={camera_id}", status_code=303)
+
     if STATIC_DIR.is_dir():
-        app.mount("/", StaticFiles(directory=STATIC_DIR, html=True), name="static")
+        app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
     return app
 
