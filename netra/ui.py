@@ -21,7 +21,7 @@ def render_dashboard(hub: CameraHub, store: EventStore, engine: EventEngine) -> 
     recordings = hub.active_recorder.list() if hub.active_recorder else []
     initial = {
         "status": status,
-        "events": store.list(active_id or None, 12),
+        "events": store.list(active_id or None, 18),
         "recordings": recordings,
     }
     return _TEMPLATES.get_template("dashboard.html").render(initial=initial)

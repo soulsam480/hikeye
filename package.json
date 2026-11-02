@@ -2,7 +2,7 @@
   "name": "netra-ui",
   "private": true,
   "version": "2.0.0",
-  "description": "Tailwind CSS + daisyUI build for the Netra dashboard",
+  "description": "Tailwind CSS build for the Netra dashboard",
   "scripts": {
     "build:css": "tailwindcss -i assets/tailwind.css -o netra/static/styles.css --minify",
     "watch:css": "tailwindcss -i assets/tailwind.css -o netra/static/styles.css --watch"
@@ -10,7 +10,6 @@
   "devDependencies": {
     "@tailwindcss/cli": "^4.3.3",
     "alpinejs": "^3.17.5",
-    "daisyui": "^5.7.50",
     "tailwindcss": "^4.3.3"
   }
 }

@@ -1,7 +1,7 @@
 # Parity report
 
 **Date:** 2026-11-02
-**App:** repo root (FastAPI + Jinja + Alpine + daisyUI).
+**App:** repo root (FastAPI + Jinja + Alpine + Tailwind).
 
 ## Verified
 
@@ -16,7 +16,7 @@
 | Recording | playable MP4, 352×288, H.264, `-c copy` |
 | Events | SQLite rows + snapshots; dedupe/cooldown and confidence gate |
 | Vision | OpenAI-compatible endpoint, reasoning disabled, `min_confidence=0.75` |
-| UI | Alpine + daisyUI, 7 chips, live status, 0 console errors |
+| UI | Jinja + Alpine + Tailwind console, 7 cameras, live status, 0 console errors |
 | Tests | `uv run pytest` — 83 passed |
 | Lint | `ruff` clean; `ty` 0 diagnostics |
 

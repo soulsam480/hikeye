@@ -200,10 +200,10 @@ netra/
   vision/         mock + OpenAI-compatible backends
   server.py       FastAPI routes, MJPEG, auth
   ui.py           Jinja render + initial state
-  templates/      dashboard template (Alpine + daisyUI)
+  templates/      dashboard template (Jinja + Alpine)
   static/         app.js, Alpine, built styles.css
   cli.py          serve / check / codecs
-assets/           Tailwind + daisyUI input
+assets/           Tailwind input and design tokens
 ```
 
 ## Privacy

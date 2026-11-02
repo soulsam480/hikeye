@@ -20,5 +20,11 @@ recordings/
 .memsearch/
 .DS_Store
 
+# Design research
+.dribbble/
+.dribbble.webp
+.playwright-cli/
+.impeccable/
+
 # UI build
 node_modules/
