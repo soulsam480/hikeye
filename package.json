@@ -1,16 +1,15 @@
 {
-  "name": "netra",
-  "version": "1.0.0",
+  "name": "netra-ui",
   "private": true,
-  "type": "module",
-  "description": "Local-first CCTV dashboard for RTSP cameras",
+  "version": "2.0.0",
+  "description": "Tailwind CSS build for the Netra dashboard",
   "scripts": {
-    "start": "node server.js",
-    "dev": "node --watch server.js",
-    "check": "node scripts/check-camera.js",
-    "test": "node --test"
+    "build:css": "tailwindcss -i assets/tailwind.css -o netra/static/styles.css --minify",
+    "watch:css": "tailwindcss -i assets/tailwind.css -o netra/static/styles.css --watch"
   },
-  "engines": {
-    "node": ">=20"
+  "devDependencies": {
+    "@tailwindcss/cli": "^4.3.3",
+    "alpinejs": "^3.17.5",
+    "tailwindcss": "^4.3.3"
   }
 }

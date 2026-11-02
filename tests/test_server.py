@@ -1,0 +1,63 @@
+from pathlib import Path
+
+from fastapi.testclient import TestClient
+
+from netra.config import Settings
+from netra.server import create_app
+
+
+def _settings(tmp_path: Path, *, dashboard_password: str = "") -> Settings:
+    return Settings.from_mapping(
+        {
+            "server": {
+                "host": "127.0.0.1",
+                "port": 8080,
+                "dashboard_user": "admin",
+                "dashboard_password": dashboard_password,
+            },
+            "dvr": {"host": "127.0.0.1", "port": 1, "user": "admin", "password": "secret"},
+            "capture": {"mode": "rtsp", "stream": "sub"},
+            "cameras": [{"id": "1", "name": "Test", "channel": 1}],
+            "vision": {"backend": "mock"},
+            "events": {
+                "db": str(tmp_path / "data/events.db"),
+                "dir": str(tmp_path / "data/events"),
+            },
+            "recording": {"dir": str(tmp_path / "recordings")},
+        },
+        root=tmp_path,
+    )
+
+
+def test_health_status_and_ui_contract(tmp_path: Path) -> None:
+    app = create_app(_settings(tmp_path))
+
+    with TestClient(app) as client:
+        health = client.get("/healthz")
+        assert health.status_code == 200
+        assert health.json()["cameras"] == 1
+
+        status = client.get("/api/status").json()
+        assert status["activeId"] == "1"
+        assert status["vision"]["name"] == "mock"
+        assert set(status["recorder"]) >= {"recording", "durationSeconds", "bytes"}
+
+        cameras = client.get("/api/cameras").json()
+        assert cameras["cameras"][0]["id"] == "1"
+        assert cameras["activeId"] == "1"
+
+        index = client.get("/")
+        assert index.status_code == 200
+        assert "Vision events" in index.text
+        assert "Test" in index.text
+        assert client.get("/static/styles.css").status_code == 200
+
+
+def test_basic_auth_protects_every_route(tmp_path: Path) -> None:
+    app = create_app(_settings(tmp_path, dashboard_password="pw"))
+
+    with TestClient(app) as client:
+        assert client.get("/healthz").status_code == 401
+        assert client.get("/").status_code == 401
+        assert client.get("/healthz", auth=("admin", "pw")).status_code == 200
+        assert client.get("/healthz", auth=("admin", "wrong")).status_code == 401

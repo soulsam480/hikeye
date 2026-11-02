@@ -1,0 +1,50 @@
+server:
+  host: 127.0.0.1
+  port: 8080
+  dashboard_user: admin
+  dashboard_password: ${DASHBOARD_PASSWORD}
+
+dvr:
+  host: 192.168.0.100
+  port: 554
+  user: admin
+  password: ${STREAM_PASS}
+
+capture:
+  mode: decrypt # decrypt | rtsp | snapshot
+  stream: sub # sub (xx2) | main (xx1)
+  transport: tcp
+  fps: 10
+  quality: 5
+  verification_code: "" # empty = read from the DVR
+
+cameras:
+  - { id: "1", name: Camera 1, channel: 1 }
+  - { id: "2", name: Camera 2, channel: 2 }
+  - { id: "3", name: Camera 3, channel: 3 }
+  - { id: "4", name: Camera 4, channel: 4 }
+  - { id: "5", name: Camera 5, channel: 5 }
+  - { id: "6", name: Camera 6, channel: 6 }
+  - { id: "7", name: Camera 7, channel: 7 }
+
+vision:
+  backend: openai # mock | openai
+  base_url: http://127.0.0.1:11234/v1
+  model: LiquidAI/LFM3-VL-2B-MLX-4bit
+  api_key: ${VISION_API_KEY}
+  interval: 2
+  cooldown: 20
+  min_confidence: 0.75
+  max_tokens: 320
+  disable_reasoning: true
+  webhook_url: ""
+
+events:
+  db: data/events.db
+  dir: data/events
+  retention_days: 30
+
+recording:
+  dir: recordings
+
+ffmpeg: ffmpeg

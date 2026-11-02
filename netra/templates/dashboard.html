@@ -1,0 +1,501 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#0b0b0c" />
+    <title>Netra · Live console</title>
+    <link rel="icon" href="/static/favicon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="/static/styles.css" />
+    <script>
+      window.NETRA = {{ initial | tojson }};
+    </script>
+    <script defer src="/static/app.js"></script>
+    <script defer src="/static/vendor/alpine.min.js"></script>
+  </head>
+
+  <body x-data="netra()" x-init="init()" @keydown.window="hotkey($event)">
+    <div class="shell">
+      <aside class="rail" aria-label="Camera rail">
+        <div class="brand">
+          <svg class="brand-mark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4">
+            <path d="M12 5c-5 0-8.5 4.4-9.7 6.2a1.4 1.4 0 0 0 0 1.6C3.5 14.6 7 19 12 19s8.5-4.4 9.7-6.2a1.4 1.4 0 0 0 0-1.6C20.5 9.4 17 5 12 5Z" />
+            <circle cx="12" cy="12" r="3.1" />
+            <circle cx="12" cy="12" r="0.9" fill="currentColor" stroke="none" />
+          </svg>
+          <div>
+            <div class="brand-name">NETRA</div>
+            <div class="brand-sub">Local observation</div>
+          </div>
+        </div>
+
+        <div class="rail-label">
+          <span class="micro">Camera roll</span>
+          <span class="micro" x-text="`${cameras.length} ch`"></span>
+        </div>
+
+        <nav class="rail-nav" aria-label="Cameras">
+          <template x-for="cam in cameras" :key="cam.id">
+            <button
+              class="cam"
+              type="button"
+              :aria-current="String(cam.id) === String(activeId) ? 'true' : 'false'"
+              @click="selectCamera(cam.id)"
+            >
+              <span class="cam-no" x-text="String(cam.channel).padStart(2, '0')"></span>
+              <span class="cam-name" x-text="cam.name"></span>
+              <span class="cam-state"></span>
+            </button>
+          </template>
+        </nav>
+
+        <div class="rail-foot">
+          <div class="rail-foot-row">
+            <span>Store</span>
+            <span class="text-bone">LAN</span>
+          </div>
+          <div class="rail-foot-row">
+            <span>Cloud</span>
+            <span class="text-bone">None</span>
+          </div>
+          <div class="rail-foot-row">
+            <span>Netra</span>
+            <span>2.0</span>
+          </div>
+        </div>
+      </aside>
+
+      <div class="min-w-0">
+        <header class="topbar">
+          <div class="crumb">
+            <span class="micro crumb-root">Console</span>
+            <span class="crumb-sep">/</span>
+            <span class="crumb-current" x-text="camera.name"></span>
+            <span class="micro" x-text="`CH ${channelOf(activeId)}`"></span>
+          </div>
+
+          <div class="top-right">
+            <span class="health" :data-tone="health.tone">
+              <span class="health-dot"></span>
+              <span x-text="health.label"></span>
+            </span>
+            <div class="text-right">
+              <div class="clock" x-text="fmtClock(now)"></div>
+              <div class="clock-date" x-text="fmtDate(now)"></div>
+            </div>
+          </div>
+        </header>
+
+        <nav class="cam-strip" aria-label="Cameras">
+          <template x-for="cam in cameras" :key="cam.id">
+            <button
+              class="cam-chip"
+              type="button"
+              :aria-current="String(cam.id) === String(activeId) ? 'true' : 'false'"
+              @click="selectCamera(cam.id)"
+            >
+              <span class="cam-chip-no" x-text="String(cam.channel).padStart(2, '0')"></span>
+              <span x-text="cam.name"></span>
+            </button>
+          </template>
+        </nav>
+
+        <main class="page">
+          <div class="workspace">
+            <section class="plate" aria-label="Live camera feed">
+              <figure class="plate-media" x-ref="videoWrap">
+                <img :src="streamSrc" :alt="`Live feed from ${camera.name}`" />
+                <span class="crop crop-tl"></span>
+                <span class="crop crop-tr"></span>
+                <span class="crop crop-bl"></span>
+                <span class="crop crop-br"></span>
+
+                <div class="plate-top">
+                  <div class="flex flex-wrap gap-1.5">
+                    <span class="tag" :class="recording ? 'tag-rec' : live ? 'tag-live' : 'tag-mute'">
+                      <span class="dot" :class="(live || recording) && 'dot-pulse'"></span>
+                      <span x-text="recording ? 'REC' : live ? 'LIVE' : camera.state"></span>
+                    </span>
+                    <span class="tag tag-mute" x-text="`CH ${channelOf(activeId)}`"></span>
+                  </div>
+                  <div class="flex flex-wrap justify-end gap-1.5">
+                    <span class="tag tag-mute" x-text="resolution"></span>
+                    <span class="tag tag-mute" x-text="`${Number(camera.fps).toFixed(1)} FPS`"></span>
+                  </div>
+                </div>
+
+                <div class="plate-offline" x-show="!live" x-cloak>
+                  <div class="plate-offline-box">
+                    <span class="scan"></span>
+                    <div class="micro">Acquiring signal</div>
+                    <p class="text-[12px] leading-relaxed text-dim" x-text="camera.error || 'Waiting for the first decrypted frame from this channel.'"></p>
+                  </div>
+                </div>
+
+                <div class="plate-bar">
+                  <div class="timecode">
+                    <span class="timecode-main" x-text="fmtClock(now)"></span>
+                    <span class="timecode-frame" x-text="`FRAME ${pad(camera.frames, 6)}`"></span>
+                  </div>
+
+                  <div class="actions">
+                    <button class="act" type="button" @click="snapshot" aria-label="Save snapshot" title="Snapshot (S)">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7">
+                        <path d="M4 8h3l1.6-2h4.8L15 8h5v11H4z" />
+                        <circle cx="12" cy="13" r="3.2" />
+                      </svg>
+                      <span class="act-label">Snapshot</span>
+                    </button>
+                    <button
+                      class="act act-rec"
+                      type="button"
+                      :data-on="recording ? 'true' : 'false'"
+                      :disabled="busy"
+                      @click="toggleRecord"
+                    >
+                      <span class="dot" :class="recording && 'dot-pulse'"></span>
+                      <span x-text="recording ? 'Stop' : 'Record'"></span>
+                    </button>
+                    <button class="act" type="button" @click="fullscreen" aria-label="Fullscreen" title="Fullscreen (F)">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7">
+                        <path d="M9 4H4v5M15 4h5v5M9 20H4v-5M15 20h5v-5" />
+                      </svg>
+                      <span class="act-label">Full</span>
+                    </button>
+                  </div>
+                </div>
+              </figure>
+            </section>
+
+            <aside class="side">
+              <section class="panel">
+                <div class="panel-head">
+                  <h2 class="panel-title">Signal</h2>
+                  <span class="panel-badge" :data-tone="live ? 'ok' : 'warn'">
+                    <span class="dot"></span>
+                    <span x-text="camera.state"></span>
+                  </span>
+                </div>
+                <div class="sig">
+                  <div class="sig-row">
+                    <span class="sig-key">Transport</span>
+                    <span class="sig-val" x-text="camera.transport"></span>
+                  </div>
+                  <div class="sig-row">
+                    <span class="sig-key">Resolution</span>
+                    <span class="sig-val" x-text="resolution"></span>
+                  </div>
+                  <div class="sig-row">
+                    <span class="sig-key">Frame rate</span>
+                    <span class="sig-val" x-text="`${Number(camera.fps).toFixed(1)} fps`"></span>
+                  </div>
+                  <div class="meter" aria-hidden="true">
+                    <span class="meter-fill" :style="`width:${fpsPct}%`"></span>
+                  </div>
+                  <div class="sig-row">
+                    <span class="sig-key">Bitrate</span>
+                    <span class="sig-val"
+                      ><span x-text="camera.bitrateKbps"></span><small>kbps</small></span
+                    >
+                  </div>
+                  <div class="meter" aria-hidden="true">
+                    <span class="meter-fill" :style="`width:${bitratePct}%`"></span>
+                  </div>
+                  <div class="sig-row">
+                    <span class="sig-key">Uptime</span>
+                    <span class="sig-val" x-text="fmtDuration(camera.uptimeSeconds)"></span>
+                  </div>
+                  <div class="sig-row">
+                    <span class="sig-key">Decryption</span>
+                    <span class="sig-val"
+                      ><span x-text="`${camera.decryption.decryptedNals}/${camera.decryption.flaggedNals}`"></span
+                      ><small>nal</small></span
+                    >
+                  </div>
+                  <div class="sig-row">
+                    <span class="sig-key">Reconnects</span>
+                    <span class="sig-val" :data-tone="camera.restarts > 0 ? 'warn' : ''" x-text="camera.restarts"></span>
+                  </div>
+                </div>
+              </section>
+
+              <section class="panel">
+                <div class="panel-head">
+                  <h2 class="panel-title">Recorder</h2>
+                  <span class="panel-badge" :data-tone="recording ? 'bad' : 'ok'">
+                    <span class="dot"></span>
+                    <span x-text="recording ? 'Recording' : 'Armed'"></span>
+                  </span>
+                </div>
+                <div class="rec-body">
+                  <div class="rec-timer" :data-on="recording ? 'true' : 'false'" x-text="fmtTimer(recorder.durationSeconds)"></div>
+                  <div class="rec-meta">
+                    <strong x-text="recorder.name || 'No active file'"></strong>
+                    <span x-text="`${fmtBytes(recorder.bytes)} · ${recording ? 'capturing' : 'standby'}`"></span>
+                  </div>
+                  <button
+                    class="btn mt-3"
+                    type="button"
+                    :data-on="recording ? 'true' : 'false'"
+                    :disabled="busy"
+                    @click="toggleRecord"
+                  >
+                    <span class="dot" :class="recording && 'dot-pulse'"></span>
+                    <span x-text="recording ? 'Stop recording' : 'Start recording'"></span>
+                  </button>
+                  <p class="btn-note">H.264 stream copy · no transcode · saved on this machine</p>
+                </div>
+              </section>
+
+              <section class="panel">
+                <div class="panel-head">
+                  <h2 class="panel-title">Vision</h2>
+                  <span class="panel-badge" :data-tone="visionState.tone">
+                    <span class="dot"></span>
+                    <span x-text="visionState.label"></span>
+                  </span>
+                </div>
+                <div class="vision-body">
+                  <div class="vision-model" :title="visionLabel" x-text="modelName(vision.model)"></div>
+                  <div class="vision-rows">
+                    <div class="vision-row">
+                      <span>Reasoning</span>
+                      <b x-text="vision.reasoning || 'default'"></b>
+                    </div>
+                    <div class="vision-row">
+                      <span>Interval</span>
+                      <b x-text="`${vision.interval}s`"></b>
+                    </div>
+                    <div class="vision-row">
+                      <span>Cooldown</span>
+                      <b x-text="`${vision.cooldown}s`"></b>
+                    </div>
+                    <div class="vision-row">
+                      <span>Last run</span>
+                      <b x-text="vision.lastRunAt ? fmtTimeShort(vision.lastRunAt * 1000) : '—'"></b>
+                    </div>
+                  </div>
+                  <p class="vision-error" x-show="vision.lastError" x-cloak x-text="vision.lastError"></p>
+                </div>
+              </section>
+            </aside>
+
+            <section class="evidence" aria-label="Evidence rail, last 24 hours">
+            <div class="evidence-head">
+              <div class="flex items-baseline gap-3">
+                <h2 class="panel-title">Evidence rail</h2>
+                <span class="micro">last 24 hours</span>
+                <span class="micro text-dim" x-text="`${railEvents.length} logged`"></span>
+              </div>
+              <div class="legend" aria-hidden="true">
+                <span class="legend-item"><span class="legend-swatch" data-tone="person"></span>Person</span>
+                <span class="legend-item"><span class="legend-swatch" data-tone="vehicle"></span>Vehicle</span>
+                <span class="legend-item"><span class="legend-swatch"></span>Other</span>
+              </div>
+            </div>
+            <div class="rail-track">
+              <div class="rail-hours">
+                <template x-for="tick in railTicks" :key="tick.left">
+                  <span class="rail-hour" :class="tick.left === 0 ? 'is-start' : tick.left === 100 ? 'is-end' : ''" :style="`left:${tick.left}%`">
+                    <span x-text="tick.label"></span>
+                  </span>
+                </template>
+              </div>
+
+              <div class="rail-pips">
+                <template x-for="event in railEvents" :key="event.id">
+                  <button
+                    class="pip"
+                    type="button"
+                    :data-tone="eventTone(event)"
+                    :style="`left:${eventLeft(event)}%; height:${eventHeight(event)}px`"
+                    :aria-label="`${event.event_type} at ${fmtTimeShort(event.created_at)}`"
+                    @mouseenter="hoveredEvent = event"
+                    @mouseleave="hoveredEvent = null"
+                    @focus="hoveredEvent = event"
+                    @blur="hoveredEvent = null"
+                    @click="openEvent(event)"
+                  ></button>
+                </template>
+              </div>
+
+              <div class="rail-now" aria-hidden="true"></div>
+
+              <p class="rail-empty" x-show="!railEvents.length" x-cloak>No activity in this window</p>
+
+              <div
+                class="pip-tip"
+                x-show="hoveredEvent"
+                x-cloak
+                :style="`left:${hoveredEvent ? eventLeft(hoveredEvent) : 0}%`"
+                x-text="hoveredEvent ? `${hoveredEvent.event_type} · ${fmtTimeShort(hoveredEvent.created_at)}` : ''"
+              ></div>
+            </div>
+            </section>
+          </div>
+
+          <section class="section" aria-label="Vision events">
+            <div class="section-head">
+              <div class="section-title">
+                <h2>Contact sheet</h2>
+                <span class="section-count" x-text="`${events.length} frames`"></span>
+              </div>
+              <span class="section-note">motion-gated · confidence ≥ 0.75</span>
+            </div>
+
+            <div class="sheet" x-show="events.length" x-cloak>
+              <template x-for="(event, index) in events" :key="event.id">
+                <button
+                  class="frame"
+                  type="button"
+                  :style="`animation-delay:${Math.min(index, 8) * 35}ms`"
+                  @click="openEvent(event)"
+                >
+                  <div class="frame-img">
+                    <img :src="`/api/events/${event.id}/snapshot`" alt="" loading="lazy" />
+                    <span class="frame-no" x-text="`F-${pad(event.id, 3)}`"></span>
+                    <span class="frame-type" :data-tone="eventTone(event)" x-text="event.event_type"></span>
+                  </div>
+                  <div class="frame-body">
+                    <div class="frame-meta">
+                      <span x-text="fmtTimeShort(event.created_at)"></span>
+                      <span x-text="`${Math.round(event.confidence * 100)}% match`"></span>
+                    </div>
+                    <p class="frame-desc" x-text="event.description"></p>
+                    <div class="frame-foot">
+                      <span x-text="`${event.people_count} people · ${event.vehicles_count} vehicles`"></span>
+                      <span x-text="`CH ${channelOf(event.camera_id)}`"></span>
+                    </div>
+                  </div>
+                </button>
+              </template>
+            </div>
+
+            <div class="empty-sheet" x-show="!events.length" x-cloak>
+              <span class="empty-glyph">+</span>
+              <span class="empty-title">No exposures yet</span>
+              <p class="empty-copy">
+                Motion above the detector threshold will log a frame here with the model's description, counts and confidence.
+              </p>
+            </div>
+          </section>
+
+          <section class="section" aria-label="Recordings">
+            <div class="section-head">
+              <div class="section-title">
+                <h2>Archive</h2>
+                <span class="section-count" x-text="`${recordings.length} clips`"></span>
+              </div>
+              <button class="mini" type="button" @click="loadRecordings()">Refresh index</button>
+            </div>
+
+            <div class="archive" x-show="recordings.length" x-cloak>
+              <div class="archive-head">
+                <span>File</span>
+                <span>Size</span>
+                <span>Modified</span>
+                <span class="text-right">Actions</span>
+              </div>
+              <template x-for="item in recordings" :key="item.name">
+                <div class="archive-row">
+                  <span class="archive-name" :title="item.name" x-text="item.name"></span>
+                  <span class="archive-cell" x-text="fmtBytes(item.bytes)"></span>
+                  <span class="archive-cell" x-text="fmtTime(item.modified_at)"></span>
+                  <div class="archive-actions">
+                    <button class="mini" type="button" @click="play(item)">Play</button>
+                    <a
+                      class="mini"
+                      :href="`/api/recordings/${encodeURIComponent(item.name)}?camera=${activeId}`"
+                      download
+                      >Download</a
+                    >
+                    <button class="mini mini-danger" type="button" @click="remove(item)">Delete</button>
+                  </div>
+                </div>
+              </template>
+            </div>
+
+            <div class="archive-empty" x-show="!recordings.length" x-cloak>
+              No clips stored for this camera. Start a recording from the live plate.
+            </div>
+          </section>
+
+          <footer class="foot">
+            <span>Netra 2.0 · local-first · no cloud accounts</span>
+            <span class="foot-keys">
+              <span><kbd>1–7</kbd> cameras</span>
+              <span><kbd>R</kbd> record</span>
+              <span><kbd>S</kbd> snapshot</span>
+              <span><kbd>F</kbd> full</span>
+            </span>
+          </footer>
+        </main>
+      </div>
+    </div>
+
+    <dialog class="modal" x-ref="eventDialog" @close="selectedEvent = null">
+      <div class="modal-head">
+        <div class="flex items-baseline gap-2">
+          <span class="micro">Frame</span>
+          <span class="font-mono text-[11px] text-bone" x-text="selectedEvent ? `F-${pad(selectedEvent.id, 3)}` : '—'"></span>
+          <span class="micro" x-text="selectedEvent ? selectedEvent.event_type : ''"></span>
+        </div>
+        <button class="modal-close" type="button" aria-label="Close" @click="closeEvent()">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.7">
+            <path d="M5 5l14 14M19 5L5 19" />
+          </svg>
+        </button>
+      </div>
+
+      <template x-if="selectedEvent">
+        <div class="event-detail">
+          <div class="event-detail-img">
+            <img :src="`/api/events/${selectedEvent.id}/snapshot`" alt="" />
+          </div>
+          <div class="event-detail-body">
+            <div class="flex items-center gap-2">
+              <span class="tag tag-rec" x-text="selectedEvent.event_type"></span>
+              <span class="tag tag-mute" x-text="`${Math.round(selectedEvent.confidence * 100)}% match`"></span>
+            </div>
+            <p class="event-detail-desc" x-text="selectedEvent.description"></p>
+            <div class="space-y-2">
+              <div class="kv"><span>Captured</span><b x-text="fmtTime(selectedEvent.created_at)"></b></div>
+              <div class="kv"><span>Camera</span><b x-text="`CH ${channelOf(selectedEvent.camera_id)}`"></b></div>
+              <div class="kv"><span>People</span><b x-text="selectedEvent.people_count"></b></div>
+              <div class="kv"><span>Vehicles</span><b x-text="selectedEvent.vehicles_count"></b></div>
+              <div class="kv"><span>Model</span><b class="truncate" x-text="modelName(selectedEvent.model)"></b></div>
+            </div>
+            <a
+              class="btn mt-auto"
+              :href="`/api/events/${selectedEvent.id}/snapshot`"
+              target="_blank"
+              rel="noopener"
+              >Open full frame</a
+            >
+          </div>
+        </div>
+      </template>
+    </dialog>
+
+    <dialog class="modal" x-ref="player" @close="playerSrc = ''">
+      <div class="modal-head">
+        <div class="flex items-baseline gap-2">
+          <span class="micro">Archive</span>
+          <span class="font-mono text-[11px] text-bone" x-text="playerTitle || '—'"></span>
+        </div>
+        <button class="modal-close" type="button" aria-label="Close" @click="closePlayer()">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.7">
+            <path d="M5 5l14 14M19 5L5 19" />
+          </svg>
+        </button>
+      </div>
+      <div class="player-box">
+        <video :src="playerSrc" controls autoplay></video>
+      </div>
+    </dialog>
+
+    <div class="toast-stack" x-show="toast" x-cloak>
+      <div class="toast" :data-kind="toastKind" x-text="toast"></div>
+    </div>
+  </body>
+</html>
