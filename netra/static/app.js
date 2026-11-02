@@ -1,3 +1,7 @@
+let audioContext = null;
+let audioSocket = null;
+let audioTime = 0;
+
 document.addEventListener('alpine:init', () => {
   Alpine.data('netra', () => ({
     status: window.NETRA.status,
@@ -21,6 +25,9 @@ document.addEventListener('alpine:init', () => {
     playerTitle: '',
     selectedEvent: null,
     hoveredEvent: null,
+    audioOn: false,
+    audioBytes: 0,
+    audioError: '',
 
     get live() {
       return this.camera.state === 'live';
@@ -48,6 +55,10 @@ document.addEventListener('alpine:init', () => {
 
     get bitratePct() {
       return Math.max(2, Math.min(100, (Number(this.camera.bitrateKbps) / 4096) * 100));
+    },
+
+    get audioState() {
+      return audioContext?.state || 'off';
     },
 
     get health() {
@@ -110,12 +121,16 @@ document.addEventListener('alpine:init', () => {
     },
 
     apply(payload) {
+      const previousActive = this.activeId;
       this.status = payload;
       this.camera = payload.camera;
       this.recorder = payload.recorder;
       this.cameras = payload.cameras;
       this.activeId = payload.activeId;
       this.vision = payload.vision;
+      if (this.audioOn && String(previousActive) !== String(payload.activeId)) {
+        this.restartAudio();
+      }
       this.$nextTick(() => this.revealActiveCamera());
     },
 
@@ -131,10 +146,104 @@ document.addEventListener('alpine:init', () => {
     toggleView() {
       this.view = this.view === 'overview' ? 'focus' : 'overview';
       if (this.view === 'overview') {
+        this.stopAudio();
         this.stillKey = Date.now();
         this.stillErrors = {};
       }
       this.$nextTick(() => window.scrollTo({ top: 0, behavior: 'smooth' }));
+    },
+
+    async toggleAudio() {
+      if (this.audioOn) {
+        this.stopAudio();
+        return;
+      }
+      await this.startAudio();
+    },
+
+    async startAudio() {
+      this.audioOn = true;
+      this.audioError = '';
+      this.audioBytes = 0;
+      try {
+        const Context = window.AudioContext || window.webkitAudioContext;
+        if (!Context) throw new Error('Audio not supported');
+        audioContext = new Context();
+        await audioContext.resume();
+        audioTime = 0;
+
+        const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const socket = new WebSocket(
+          `${protocol}//${location.host}/ws/audio?camera=${encodeURIComponent(this.activeId)}`,
+        );
+        socket.binaryType = 'arraybuffer';
+        socket.onmessage = (event) => {
+          if (typeof event.data === 'string') {
+            this.failAudio(event.data);
+            return;
+          }
+          this.playPcm(event.data);
+        };
+        socket.onclose = () => {
+          if (this.audioOn) this.failAudio('Audio disconnected');
+        };
+        socket.onerror = () => {
+          if (this.audioOn) this.failAudio('Audio connection failed');
+        };
+        audioSocket = socket;
+      } catch (error) {
+        this.failAudio(error?.message || 'Audio unavailable');
+      }
+    },
+
+    playPcm(payload) {
+      if (!audioContext || !payload || !payload.byteLength) return;
+      try {
+        const pcm = new Int16Array(payload);
+        const buffer = audioContext.createBuffer(1, pcm.length, 16000);
+        const channel = buffer.getChannelData(0);
+        for (let index = 0; index < pcm.length; index += 1) {
+          channel[index] = pcm[index] / 32768;
+        }
+        const source = audioContext.createBufferSource();
+        source.buffer = buffer;
+        source.connect(audioContext.destination);
+        const now = audioContext.currentTime;
+        if (audioTime < now + 0.02) audioTime = now + 0.12;
+        source.start(audioTime);
+        audioTime += buffer.duration;
+        this.audioBytes += pcm.length;
+      } catch {
+        this.failAudio('Audio playback failed');
+      }
+    },
+
+    failAudio(message) {
+      this.audioError = message;
+      this.notify(message, 'error');
+      this.stopAudio();
+    },
+
+    stopAudio() {
+      this.audioOn = false;
+      if (audioSocket) {
+        audioSocket.onclose = null;
+        audioSocket.onerror = null;
+        audioSocket.onmessage = null;
+        audioSocket.close();
+        audioSocket = null;
+      }
+      if (audioContext) {
+        audioContext.close().catch(() => {});
+        audioContext = null;
+      }
+      audioTime = 0;
+    },
+
+    async restartAudio() {
+      const wasOn = this.audioOn;
+      this.stopAudio();
+      if (wasOn) await this.startAudio();
     },
 
     async focusCamera(id) {
@@ -161,6 +270,7 @@ document.addEventListener('alpine:init', () => {
         this.activeId = String(id);
         this.frameKey = Date.now();
         await this.refresh();
+        if (this.audioOn) await this.restartAudio();
         await this.loadEvents();
         await this.loadRecordings();
       } finally {

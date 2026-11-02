@@ -9,7 +9,7 @@ No cloud, no hosted inference, no accounts.
 - **7-camera selector** — one live stream at a time, all channels configured
 - **Decrypts Hikvision stream encryption** in real time (AES-128, H.264)
 - **Reads the verification code from the DVR** with an admin account
-- **Live MJPEG**, snapshots, per-camera MP4 recording, browser playback
+- **Live MJPEG + camera audio**, snapshots, per-camera MP4 recording, browser playback
 - **Vision events** — motion-gated frames sent to a local VLM endpoint; people,
   vehicles, animals, descriptions, confidence, snapshots
 - **SQLite event store** with cooldowns/dedupe and retention
@@ -157,6 +157,7 @@ Events live in SQLite (`data/events.db`), snapshots in `data/events/<camera>/`.
 | `GET` | `/api/cameras` | Camera list |
 | `POST` | `/api/cameras/:id/activate` | Switch camera |
 | `GET` | `/api/cameras/:id/still.jpg` | ISAPI still for the all-camera wall |
+| `WS` | `/ws/audio?camera=1` | Live PCM audio (G.711 μ-law → 16 kHz s16le) |
 | `GET` | `/api/snapshot.jpg?camera=1` | Single JPEG |
 | `GET` | `/stream.mjpeg?camera=1` | Live MJPEG |
 | `GET` | `/api/recordings?camera=1` | List recordings |

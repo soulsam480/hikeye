@@ -16,7 +16,8 @@
 | Recording | playable MP4, 352×288, H.264, `-c copy` |
 | Events | SQLite rows + snapshots; dedupe/cooldown and confidence gate |
 | Vision | OpenAI-compatible endpoint, reasoning disabled, `min_confidence=0.75` |
-| UI | Jinja + Alpine + Tailwind console, 7 cameras, all-camera wall, live status, 0 console errors |
+| UI | Jinja + Alpine + Tailwind console, 7 cameras, all-camera wall, live audio, live status, 0 console errors |
+| Audio | Sub-stream PCM μ-law 8 kHz → WebSocket 16 kHz s16le → AudioContext running |
 | Tests | `uv run pytest` — 83 passed |
 | Lint | `ruff` clean; `ty` 0 diagnostics |
 

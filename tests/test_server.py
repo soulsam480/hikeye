@@ -3,7 +3,7 @@ from pathlib import Path
 from fastapi.testclient import TestClient
 
 from netra.config import Settings
-from netra.server import create_app
+from netra.server import _audio_command, create_app
 
 
 def _settings(tmp_path: Path, *, dashboard_password: str = "") -> Settings:
@@ -52,6 +52,17 @@ def test_health_status_and_ui_contract(tmp_path: Path) -> None:
         assert "All cameras" in index.text
         assert "Test" in index.text
         assert client.get("/static/styles.css").status_code == 200
+
+
+def test_audio_command_extracts_pcm(tmp_path: Path) -> None:
+    settings = _settings(tmp_path)
+    command = _audio_command(settings, settings.cameras[0])
+
+    assert "-vn" in command
+    assert command[command.index("-map") + 1] == "0:a:0"
+    assert command[command.index("-ar") + 1] == "16000"
+    assert command[-1] == "pipe:1"
+    assert settings.cameras[0].stream_url in command
 
 
 def test_still_route_returns_jpeg(tmp_path: Path, monkeypatch) -> None:

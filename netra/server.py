@@ -9,8 +9,9 @@ from collections.abc import AsyncGenerator, AsyncIterator
 from contextlib import asynccontextmanager, suppress
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlsplit
 
-from fastapi import FastAPI, HTTPException, Query, Request, Response
+from fastapi import FastAPI, HTTPException, Query, Request, Response, WebSocket, WebSocketDisconnect
 from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
@@ -139,6 +140,47 @@ def create_app(settings: Settings) -> FastAPI:
         return Response(
             content=frame, media_type="image/jpeg", headers={"Cache-Control": "no-store"}
         )
+
+    @app.websocket("/ws/audio")
+    async def audio(
+        websocket: WebSocket,
+        camera: str | None = Query(default=None),
+    ) -> None:
+        origin = websocket.headers.get("origin")
+        host = websocket.headers.get("host")
+        if origin and host and urlsplit(origin).netloc != host:
+            await websocket.close(code=1008)
+            return
+
+        camera_id = camera or hub.active_id
+        definition = _camera_definition(settings, camera_id) if camera_id else None
+        if definition is None:
+            await websocket.close(code=1008)
+            return
+
+        await websocket.accept()
+        process: asyncio.subprocess.Process | None = None
+        try:
+            process = await asyncio.create_subprocess_exec(
+                *_audio_command(settings, definition),
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.DEVNULL,
+            )
+            assert process.stdout is not None
+            while True:
+                chunk = await process.stdout.read(3200)
+                if not chunk:
+                    break
+                await websocket.send_bytes(chunk)
+        except WebSocketDisconnect:
+            pass
+        finally:
+            if process is not None and process.returncode is None:
+                process.terminate()
+                with suppress(ProcessLookupError):
+                    await process.wait()
+            with suppress(RuntimeError):
+                await websocket.close()
 
     @app.get("/stream.mjpeg")
     async def stream(camera: str | None = Query(default=None)) -> StreamingResponse:
@@ -290,6 +332,33 @@ def _status_payload(hub: CameraHub, engine: EventEngine) -> dict[str, Any]:
 
 def _camera_definition(settings: Settings, camera_id: str) -> CameraConfig | None:
     return next((camera for camera in settings.cameras if camera.id == str(camera_id)), None)
+
+
+def _audio_command(settings: Settings, camera: CameraConfig) -> tuple[str, ...]:
+    """Extract the unencrypted PCM μ-law audio track from the camera's RTSP sub stream."""
+    return (
+        settings.ffmpeg_path,
+        "-hide_banner",
+        "-loglevel",
+        "error",
+        "-nostdin",
+        "-rtsp_transport",
+        "tcp",
+        "-i",
+        camera.stream_url,
+        "-vn",
+        "-map",
+        "0:a:0",
+        "-ac",
+        "1",
+        "-ar",
+        "16000",
+        "-f",
+        "s16le",
+        "-acodec",
+        "pcm_s16le",
+        "pipe:1",
+    )
 
 
 def _read_still(settings: Settings, camera: CameraConfig) -> bytes:

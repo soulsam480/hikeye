@@ -729,6 +729,18 @@
     color: var(--ink);
   }
 
+  .act-audio[data-on="true"] {
+    border-color: rgb(154 185 115 / 0.65);
+    background: rgb(154 185 115 / 0.1);
+    color: var(--sage);
+  }
+
+  .act-audio[data-on="true"]:hover {
+    border-color: var(--sage);
+    background: var(--sage);
+    color: var(--ink);
+  }
+
   /* ---------- side panels ---------- */
 
   .side {

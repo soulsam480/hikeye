@@ -163,6 +163,22 @@
                       <span class="act-label">Snapshot</span>
                     </button>
                     <button
+                      class="act act-audio"
+                      type="button"
+                      :data-on="audioOn ? 'true' : 'false'"
+                      :aria-pressed="audioOn ? 'true' : 'false'"
+                      :aria-label="audioOn ? 'Mute camera audio' : 'Listen to camera audio'"
+                      :title="audioOn ? 'Mute camera audio' : 'Listen to camera audio'"
+                      @click="toggleAudio"
+                    >
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7">
+                        <path d="M4 9h3l4-3v12l-4-3H4z" />
+                        <path d="M15 9a4 4 0 0 1 0 6" />
+                        <path d="M17.5 6.5a7.5 7.5 0 0 1 0 11" />
+                      </svg>
+                      <span class="act-label" x-text="audioOn ? 'Audio on' : 'Audio'"></span>
+                    </button>
+                    <button
                       class="act act-rec"
                       type="button"
                       :data-on="recording ? 'true' : 'false'"
