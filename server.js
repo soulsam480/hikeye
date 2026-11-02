@@ -5,6 +5,7 @@ import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { loadConfig, redactUrl } from './src/config.js';
 import { CameraHub } from './src/hub.js';
+import { readVerificationCode } from './src/isapi.js';
 
 const rootDir = path.dirname(fileURLToPath(import.meta.url));
 const publicDir = path.join(rootDir, 'public');
@@ -13,6 +14,7 @@ const config = loadConfig();
 const log = (...args) => console.log(new Date().toISOString(), ...args);
 
 const snapshotMode = config.streamMode === 'snapshot';
+const decryptMode = config.streamMode === 'decrypt';
 const hub = new CameraHub(config);
 
 const MIME = {
@@ -94,7 +96,12 @@ function statusPayload() {
           uptimeSeconds: 0,
           lastFrameAt: null,
           restarts: 0,
-          transport: config.streamMode === 'snapshot' ? 'http' : config.streamTransport,
+          transport:
+            config.streamMode === 'snapshot'
+              ? 'http'
+              : config.streamMode === 'decrypt'
+                ? 'rtsp+aes'
+                : config.streamTransport,
         },
     recorder: activeRecorder
       ? activeRecorder.status()
@@ -374,18 +381,40 @@ const server = http.createServer((req, res) => {
 server.requestTimeout = 0;
 server.headersTimeout = 60_000;
 
-server.listen(config.port, config.host, () => {
+server.listen(config.port, config.host, async () => {
   log(`Netra listening on http://${config.host}:${config.port}`);
   log(
     `Cameras: ${config.cameras.length} configured (${config.cameras
       .map((camera) => `${camera.id}:${camera.name}`)
       .join(', ')})`,
   );
+
+  if (decryptMode) {
+    const host = new URL(config.streamUrl).hostname;
+    const deviceCode = await readVerificationCode({
+      host,
+      user: config.streamUser,
+      pass: config.streamPass,
+    });
+    if (deviceCode) {
+      config.verificationCode = deviceCode;
+      log(`Decryption: read the verification code from the DVR (${deviceCode.length} chars)`);
+    } else if (config.verificationCode) {
+      log('Decryption: using the verification code from .env');
+    } else {
+      log('Decryption: no verification code found. Set STREAM_SECRET_KEY or use an admin account.');
+      process.exit(1);
+    }
+  }
+
   log(
-    snapshotMode
-      ? `Capture: HTTP snapshots at ${config.snapshotFps} fps`
-      : `Capture: RTSP (${redactUrl(config.streamUrl)})`,
+    decryptMode
+      ? 'Capture: RTSP + AES-128 decryption'
+      : snapshotMode
+        ? `Capture: HTTP snapshots at ${config.snapshotFps} fps`
+        : `Capture: RTSP (${redactUrl(config.streamUrl)})`,
   );
+
   if (!config.dashboardPassword) {
     log('Warning: DASHBOARD_PASSWORD is empty. Bind to 127.0.0.1 or set a password.');
   }

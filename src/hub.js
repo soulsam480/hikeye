@@ -1,6 +1,7 @@
 import path from 'node:path';
 import { CameraStream } from './camera.js';
 import { SnapshotCamera } from './snapshot-camera.js';
+import { HikvisionCamera } from './hikvision-camera.js';
 import { Recorder, SnapshotRecorder } from './recorder.js';
 
 /**
@@ -48,7 +49,18 @@ export class CameraHub {
             name: definition.name,
             logger: this.logger,
           })
-        : new CameraStream({
+        : this.config.streamMode === 'decrypt'
+          ? new HikvisionCamera({
+              url: definition.streamUrl,
+              user: this.config.streamUser,
+              pass: this.config.streamPass,
+              verificationCode: this.config.verificationCode,
+              fps: this.config.streamFps,
+              quality: this.config.streamQuality,
+              ffmpegPath: this.config.ffmpegPath,
+              name: definition.name,
+            })
+          : new CameraStream({
             url: definition.streamUrl,
             name: definition.name,
             fps: this.config.streamFps,
@@ -60,10 +72,11 @@ export class CameraHub {
 
     this.cameras.set(key, camera);
 
-    // Snapshot recorders consume the same frames the browser receives.
+    // Recorders consume the throttled frames the browser sees, so recordings
+    // play at the right speed.
     const recorder = this.recorderFor(key);
     if (typeof recorder.push === 'function') {
-      camera.on('frame', (frame) => recorder.push(frame));
+      camera.on('broadcast', (frame) => recorder.push(frame));
     }
 
     return camera;
@@ -77,10 +90,13 @@ export class CameraHub {
 
     const dir = path.join(this.config.recordingsDir, key);
     const recorder =
-      this.config.streamMode === 'snapshot'
+      this.config.streamMode === 'snapshot' || this.config.streamMode === 'decrypt'
         ? new SnapshotRecorder({
             dir,
-            fps: this.config.snapshotFps,
+            fps:
+              this.config.streamMode === 'decrypt'
+                ? this.config.streamFps
+                : this.config.snapshotFps,
             ffmpegPath: this.config.ffmpegPath,
           })
         : new Recorder({

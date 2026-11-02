@@ -327,6 +327,7 @@ export class CameraStream extends EventEmitter {
       this.byteWindow.push({ t: now, bytes: frame.length });
       while (this.byteWindow.length && now - this.byteWindow[0].t > 5000) this.byteWindow.shift();
       this._broadcast(this.lastFrame);
+      this.emit('broadcast', this.lastFrame);
     }
   }
 

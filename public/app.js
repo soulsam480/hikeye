@@ -19,6 +19,7 @@ const els = {
   statFps: $('statFps'),
   statRestarts: $('statRestarts'),
   statFrames: $('statFrames'),
+  statDecrypt: $('statDecrypt'),
   transportChip: $('transportChip'),
   modeHint: $('modeHint'),
   errorBox: $('errorBox'),
@@ -202,6 +203,16 @@ function renderStatus(payload) {
   els.statFps.textContent = camera.live ? `${camera.fps} fps` : '—';
   els.statRestarts.textContent = camera.restarts;
   els.statFrames.textContent = camera.frames.toLocaleString();
+
+  const decryption = camera.decryption;
+  if (decryption?.enabled) {
+    els.statDecrypt.textContent = `${decryption.decryptedNals} / ${decryption.flaggedNals} NALs`;
+    els.statDecrypt.style.color =
+      decryption.flaggedNals > 0 && decryption.decryptedNals > 0 ? 'var(--accent)' : 'var(--warn)';
+  } else {
+    els.statDecrypt.textContent = '—';
+    els.statDecrypt.style.color = '';
+  }
 
   if (camera.error) {
     els.errorBox.hidden = false;
