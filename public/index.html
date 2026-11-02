@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#0a0f16" />
+    <title>Netra · Camera Dashboard</title>
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <div class="ambient"></div>
+
+    <header class="topbar">
+      <div class="brand">
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M12 5c-5 0-8.5 4.4-9.7 6.2a1.4 1.4 0 0 0 0 1.6C3.5 14.6 7 19 12 19s8.5-4.4 9.7-6.2a1.4 1.4 0 0 0 0-1.6C20.5 9.4 17 5 12 5Z" />
+          <circle cx="12" cy="12" r="3.2" />
+        </svg>
+        <span class="brand-name">NETRA</span>
+        <span class="brand-tag">cctv</span>
+      </div>
+
+      <div class="topbar-right">
+        <span class="clock" id="clock">--:--:--</span>
+        <span class="pill" id="connPill">
+          <span class="dot"></span>
+          <span id="connText">connecting</span>
+        </span>
+      </div>
+    </header>
+
+    <main>
+      <nav class="camera-bar" id="cameraBar" aria-label="Cameras"></nav>
+
+      <section class="card viewer">
+        <div class="video-wrap" id="videoWrap">
+          <img id="live" alt="Live camera feed" />
+          <div class="scanline" aria-hidden="true"></div>
+
+          <div class="video-top">
+            <span class="badge badge-live" id="liveBadge"><span class="dot"></span> LIVE</span>
+            <span class="badge badge-meta" id="resBadge">—</span>
+          </div>
+
+          <div class="video-controls">
+            <button class="btn btn-ghost" id="btnSnapshot" title="Save snapshot (S)">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8.5h3l1.5-2h7L17 8.5h3v10H4z"/><circle cx="12" cy="13.2" r="3.2"/></svg>
+              Snapshot
+            </button>
+            <button class="btn btn-ghost" id="btnFullscreen" title="Fullscreen (F)">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg>
+              Fullscreen
+            </button>
+            <button class="btn btn-rec" id="btnRecord" title="Toggle recording (R)">
+              <span class="rec-dot"></span>
+              <span id="recordLabel">Record</span>
+            </button>
+          </div>
+
+          <div class="video-status" id="videoStatus">
+            <span class="spinner"></span>
+            <span>Connecting to camera…</span>
+          </div>
+        </div>
+
+        <div class="viewer-foot">
+          <div class="foot-item">
+            <span class="label">Camera</span>
+            <strong id="camName">—</strong>
+          </div>
+          <div class="foot-item">
+            <span class="label">Uptime</span>
+            <strong id="uptime">—</strong>
+          </div>
+          <div class="foot-item">
+            <span class="label">Viewers</span>
+            <strong id="viewers">—</strong>
+          </div>
+          <div class="foot-item">
+            <span class="label">Bitrate</span>
+            <strong id="bitrate">—</strong>
+          </div>
+        </div>
+      </section>
+
+      <aside class="side">
+        <section class="card">
+          <div class="card-head">
+            <h2>Stream health</h2>
+            <span class="chip" id="transportChip">tcp</span>
+          </div>
+          <dl class="stats">
+            <div><dt>Status</dt><dd id="statState">—</dd></div>
+            <div><dt>Resolution</dt><dd id="statRes">—</dd></div>
+            <div><dt>Frame rate</dt><dd id="statFps">—</dd></div>
+            <div><dt>Reconnects</dt><dd id="statRestarts">—</dd></div>
+            <div><dt>Frames seen</dt><dd id="statFrames">—</dd></div>
+          </dl>
+          <p class="hint" id="modeHint" hidden></p>
+          <div class="error-box" id="errorBox" hidden>
+            <strong>Camera error</strong>
+            <p id="errorText"></p>
+          </div>
+        </section>
+
+        <section class="card">
+          <div class="card-head">
+            <h2>Recording</h2>
+            <span class="chip" id="recChip">idle</span>
+          </div>
+          <div class="rec-meta">
+            <div><span class="label">Current file</span><strong id="recFile">—</strong></div>
+            <div><span class="label">Elapsed</span><strong id="recTime">—</strong></div>
+            <div><span class="label">Size</span><strong id="recSize">—</strong></div>
+          </div>
+          <button class="btn btn-rec btn-block" id="btnRecord2">
+            <span class="rec-dot"></span>
+            <span id="recordLabel2">Start recording</span>
+          </button>
+          <p class="hint">Copies the camera stream to disk without re-encoding, so it costs almost no CPU.</p>
+        </section>
+      </aside>
+
+      <section class="card recordings">
+        <div class="card-head">
+          <h2>Recordings</h2>
+          <div class="head-actions">
+            <button class="btn btn-ghost btn-sm" id="btnRefresh">Refresh</button>
+          </div>
+        </div>
+        <div class="rec-list" id="recList">
+          <div class="empty">No recordings yet. Hit record to capture the stream.</div>
+        </div>
+      </section>
+    </main>
+
+    <div class="modal" id="modal" hidden>
+      <div class="modal-backdrop" data-close></div>
+      <div class="modal-body">
+        <div class="modal-head">
+          <strong id="modalTitle">Playback</strong>
+          <button class="btn btn-ghost btn-sm" data-close>Close</button>
+        </div>
+        <video id="player" controls autoplay playsinline></video>
+      </div>
+    </div>
+
+    <div class="toasts" id="toasts" aria-live="polite"></div>
+
+    <script type="module" src="/app.js"></script>
+  </body>
+</html>

@@ -1,0 +1,23 @@
+[tools]
+node = "24"
+bun = "1.4"
+
+[tasks.start]
+description = "Start the dashboard with Node"
+run = "node server.js"
+
+[tasks."start:bun"]
+description = "Start the dashboard with Bun"
+run = "bun server.js"
+
+[tasks.dev]
+description = "Start with auto-restart on file changes"
+run = "node --watch server.js"
+
+[tasks.check]
+description = "Verify the camera credentials and stream"
+run = "node scripts/check-camera.js"
+
+[tasks.test]
+description = "Run the unit tests"
+run = "node --test"
