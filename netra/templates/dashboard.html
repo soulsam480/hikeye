@@ -328,11 +328,6 @@
                       </span>
                       <span class="cam-tile-bottom">
                         <span class="cam-tile-name" x-text="cam.name"></span>
-                        <span
-                          class="cam-tile-mode"
-                          :data-live="String(cam.id) === String(activeId) ? 'true' : 'false'"
-                          x-text="String(cam.id) === String(activeId) ? 'Live' : 'View'"
-                        ></span>
                       </span>
                       <span class="cam-tile-offline" x-show="stillErrors[cam.id]" x-cloak>No still</span>
                     </button>
