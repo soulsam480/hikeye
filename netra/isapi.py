@@ -55,6 +55,13 @@ class IsapiClient:
     def get_channel(self, stream_id: int | str) -> str:
         return self._get(_channel_path(stream_id))
 
+    def get_snapshot(self, stream_id: int | str) -> bytes:
+        """Return a JPEG still for a channel without touching the live RTSP session."""
+        data = self._request_bytes("GET", f"{_channel_path(stream_id)}/picture")
+        if not data.startswith(b"\xff\xd8"):
+            raise RuntimeError("ISAPI snapshot was not a JPEG")
+        return data
+
     def set_channel_codec(self, stream_id: int | str, codec: str = "H.264") -> bool:
         """PUT the channel back with only <videoCodecType> changed."""
         path = _channel_path(stream_id)
@@ -66,6 +73,12 @@ class IsapiClient:
         return self._request("GET", path)
 
     def _request(self, method: str, path: str, body: str | None = None) -> str:
+        return self._send(method, path, body).text
+
+    def _request_bytes(self, method: str, path: str) -> bytes:
+        return self._send(method, path).content
+
+    def _send(self, method: str, path: str, body: str | None = None) -> httpx.Response:
         headers = {"Content-Type": "application/xml"} if body is not None else None
         response = self._client.request(method, path, content=body, headers=headers)
         if not response.is_success:
@@ -73,7 +86,7 @@ class IsapiClient:
                 f"ISAPI {method} {path} failed: HTTP {response.status_code} "
                 f"{response.reason_phrase}"
             )
-        return response.text
+        return response
 
 
 def read_verification_code(

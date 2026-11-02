@@ -49,8 +49,24 @@ def test_health_status_and_ui_contract(tmp_path: Path) -> None:
         index = client.get("/")
         assert index.status_code == 200
         assert "Vision events" in index.text
+        assert "All cameras" in index.text
         assert "Test" in index.text
         assert client.get("/static/styles.css").status_code == 200
+
+
+def test_still_route_returns_jpeg(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.setattr(
+        "netra.server._read_still",
+        lambda settings, camera: b"\xff\xd8still",
+    )
+    app = create_app(_settings(tmp_path))
+
+    with TestClient(app) as client:
+        still = client.get("/api/cameras/1/still.jpg")
+        assert still.status_code == 200
+        assert still.content == b"\xff\xd8still"
+        assert still.headers["content-type"] == "image/jpeg"
+        assert client.get("/api/cameras/nope/still.jpg").status_code == 404
 
 
 def test_basic_auth_protects_every_route(tmp_path: Path) -> None:

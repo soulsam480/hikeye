@@ -68,6 +68,9 @@ one column, and archive rows stack.
 - **Evidence rail:** 24-hour window, six hour ticks, event pips whose height
   encodes confidence and colour encodes type, a live "now" marker, hover tip,
   click opens the event frame.
+- **All-camera wall:** four-up desktop grid of 704×576 ISAPI stills, each with
+  channel, active/still state, and name; clicking a tile activates that camera
+  and returns to focus. Stills refresh every 8 seconds.
 - **Contact sheet:** photographic frames with `F-###` numbers, type tag,
   timestamp, confidence, two-line description, counts, and channel.
 - **Archive:** file, size, modified, play/download/delete. Delete is isolated

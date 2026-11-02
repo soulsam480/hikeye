@@ -40,7 +40,7 @@
               class="cam"
               type="button"
               :aria-current="String(cam.id) === String(activeId) ? 'true' : 'false'"
-              @click="selectCamera(cam.id)"
+              @click="focusCamera(cam.id)"
             >
               <span class="cam-no" x-text="String(cam.channel).padStart(2, '0')"></span>
               <span class="cam-name" x-text="cam.name"></span>
@@ -75,6 +75,22 @@
           </div>
 
           <div class="top-right">
+            <button
+              class="view-toggle"
+              type="button"
+              :aria-pressed="view === 'overview' ? 'true' : 'false'"
+              :aria-label="view === 'overview' ? 'Back to live focus' : 'Show all cameras'"
+              @click="toggleView()"
+              :title="view === 'overview' ? 'Back to live focus' : 'Show all cameras'"
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true">
+                <rect x="3" y="3" width="7" height="7" />
+                <rect x="14" y="3" width="7" height="7" />
+                <rect x="3" y="14" width="7" height="7" />
+                <rect x="14" y="14" width="7" height="7" />
+              </svg>
+              <span class="view-label" x-text="view === 'overview' ? 'Focus' : 'All cameras'"></span>
+            </button>
             <span class="health" :data-tone="health.tone">
               <span class="health-dot"></span>
               <span x-text="health.label"></span>
@@ -92,7 +108,7 @@
               class="cam-chip"
               type="button"
               :aria-current="String(cam.id) === String(activeId) ? 'true' : 'false'"
-              @click="selectCamera(cam.id)"
+              @click="focusCamera(cam.id)"
             >
               <span class="cam-chip-no" x-text="String(cam.channel).padStart(2, '0')"></span>
               <span x-text="cam.name"></span>
@@ -101,8 +117,8 @@
         </nav>
 
         <main class="page">
-          <div class="workspace">
-            <section class="plate" aria-label="Live camera feed">
+          <div class="workspace" :class="view === 'overview' ? 'is-overview' : ''">
+            <section class="plate" aria-label="Live camera feed" x-show="view === 'focus'">
               <figure class="plate-media" x-ref="videoWrap">
                 <img :src="streamSrc" :alt="`Live feed from ${camera.name}`" />
                 <span class="crop crop-tl"></span>
@@ -167,7 +183,7 @@
               </figure>
             </section>
 
-            <aside class="side">
+            <aside class="side" x-show="view === 'focus'">
               <section class="panel">
                 <div class="panel-head">
                   <h2 class="panel-title">Signal</h2>
@@ -279,6 +295,51 @@
                 </div>
               </section>
             </aside>
+
+            <template x-if="view === 'overview'">
+              <section class="overview" aria-label="All cameras">
+                <div class="overview-head">
+                  <div class="section-title">
+                    <h2>All cameras</h2>
+                    <span class="section-count" x-text="`${cameras.length} channels`"></span>
+                  </div>
+                  <span class="section-note">stills refresh every 8s · click a tile to focus</span>
+                </div>
+                <div class="overview-grid">
+                  <template x-for="cam in cameras" :key="cam.id">
+                    <button
+                      class="cam-tile"
+                      type="button"
+                      :class="String(cam.id) === String(activeId) ? 'is-active' : ''"
+                      @click="focusCamera(cam.id)"
+                    >
+                      <img
+                        :src="stillSrc(cam.id)"
+                        :alt="`${cam.name} still`"
+                        @load="stillErrors[cam.id] = false"
+                        @error="stillErrors[cam.id] = true"
+                      />
+                      <span class="cam-tile-top">
+                        <span class="tag tag-mute" x-text="`CH ${String(cam.channel).padStart(2, '0')}`"></span>
+                        <span class="tag" :class="String(cam.id) === String(activeId) ? 'tag-live' : 'tag-mute'">
+                          <span class="dot" :class="String(cam.id) === String(activeId) && 'dot-pulse'"></span>
+                          <span x-text="String(cam.id) === String(activeId) ? 'Active' : 'Still'"></span>
+                        </span>
+                      </span>
+                      <span class="cam-tile-bottom">
+                        <span class="cam-tile-name" x-text="cam.name"></span>
+                        <span
+                          class="cam-tile-mode"
+                          :data-live="String(cam.id) === String(activeId) ? 'true' : 'false'"
+                          x-text="String(cam.id) === String(activeId) ? 'Live' : 'View'"
+                        ></span>
+                      </span>
+                      <span class="cam-tile-offline" x-show="stillErrors[cam.id]" x-cloak>No still</span>
+                    </button>
+                  </template>
+                </div>
+              </section>
+            </template>
 
             <section class="evidence" aria-label="Evidence rail, last 24 hours">
             <div class="evidence-head">

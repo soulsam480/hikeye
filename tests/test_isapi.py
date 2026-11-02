@@ -101,6 +101,26 @@ def test_get_channel_returns_raw_xml(stream_id: int | str) -> None:
         assert client.get_channel(stream_id) == CHANNEL_XML
 
 
+def test_get_snapshot_returns_jpeg_bytes() -> None:
+    payload = b"\xff\xd8\xff\xe0jpeg"
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert request.method == "GET"
+        assert request.url.path == "/ISAPI/Streaming/channels/102/picture"
+        return httpx.Response(200, content=payload, headers={"content-type": "image/jpeg"})
+
+    with _client(handler) as client:
+        assert client.get_snapshot(102) == payload
+
+
+def test_get_snapshot_rejects_non_jpeg() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, content=b"<html>error</html>")
+
+    with _client(handler) as client, pytest.raises(RuntimeError, match="JPEG"):
+        client.get_snapshot(102)
+
+
 def test_set_channel_codec_put_preserves_other_fields() -> None:
     seen: dict[str, str] = {}
 

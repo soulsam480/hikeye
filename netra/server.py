@@ -4,6 +4,7 @@ import asyncio
 import base64
 import json
 import secrets
+import time
 from collections.abc import AsyncGenerator, AsyncIterator
 from contextlib import asynccontextmanager, suppress
 from pathlib import Path
@@ -13,7 +14,7 @@ from fastapi import FastAPI, HTTPException, Query, Request, Response
 from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
-from .config import Settings
+from .config import CameraConfig, Settings
 from .engine import EventEngine, create_backend
 from .events import EventStore
 from .hub import CameraHub, UnknownCameraError
@@ -29,6 +30,7 @@ def create_app(settings: Settings) -> FastAPI:
     store = EventStore(settings.events_db, settings.events_dir, settings.vision_cooldown)
     backend = create_backend(settings)
     engine = EventEngine(settings, hub, store, backend)
+    still_cache: dict[str, tuple[float, bytes]] = {}
 
     @asynccontextmanager
     async def lifespan(_: FastAPI) -> AsyncGenerator[None]:
@@ -89,6 +91,32 @@ def create_app(settings: Settings) -> FastAPI:
     @app.get("/api/cameras")
     async def cameras() -> dict[str, Any]:
         return {"cameras": hub.list(), "activeId": hub.active_id}
+
+    @app.get("/api/cameras/{camera_id}/still.jpg")
+    async def camera_still(camera_id: str) -> Response:
+        camera = _camera_definition(settings, camera_id)
+        if camera is None:
+            raise HTTPException(status_code=404, detail="Unknown camera")
+
+        cached = still_cache.get(camera.id)
+        if cached and time.monotonic() - cached[0] < 2.5:
+            frame = cached[1]
+        else:
+            try:
+                frame = await asyncio.to_thread(_read_still, settings, camera)
+            except Exception:
+                worker = hub.active_camera if str(hub.active_id) == camera.id else None
+                frame = worker.latest()[0] if worker else b""
+                if not frame:
+                    raise HTTPException(status_code=502, detail="Snapshot unavailable") from None
+            else:
+                still_cache[camera.id] = (time.monotonic(), frame)
+
+        return Response(
+            content=frame,
+            media_type="image/jpeg",
+            headers={"Cache-Control": "no-store"},
+        )
 
     @app.post("/api/cameras/{camera_id}/activate")
     async def activate(camera_id: str) -> dict[str, Any]:
@@ -258,6 +286,20 @@ def _status_payload(hub: CameraHub, engine: EventEngine) -> dict[str, Any]:
     payload = hub.status_payload()
     payload["vision"] = engine.status()
     return payload
+
+
+def _camera_definition(settings: Settings, camera_id: str) -> CameraConfig | None:
+    return next((camera for camera in settings.cameras if camera.id == str(camera_id)), None)
+
+
+def _read_still(settings: Settings, camera: CameraConfig) -> bytes:
+    with IsapiClient(
+        f"http://{settings.stream_ip}",
+        settings.stream_user,
+        settings.stream_pass,
+        timeout=5.0,
+    ) as client:
+        return client.get_snapshot(camera.stream_id)
 
 
 def _read_verification_code(settings: Settings) -> str | None:

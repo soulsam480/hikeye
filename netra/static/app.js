@@ -12,6 +12,9 @@ document.addEventListener('alpine:init', () => {
     now: new Date(),
     busy: false,
     frameKey: Date.now(),
+    view: 'focus',
+    stillKey: Date.now(),
+    stillErrors: {},
     toast: '',
     toastKind: 'info',
     playerSrc: '',
@@ -92,6 +95,9 @@ document.addEventListener('alpine:init', () => {
       setInterval(() => this.refresh(), 2000);
       setInterval(() => this.loadEvents(), 5000);
       setInterval(() => this.loadRecordings(), 15000);
+      setInterval(() => {
+        this.stillKey = Date.now();
+      }, 8000);
     },
 
     async refresh() {
@@ -120,6 +126,25 @@ document.addEventListener('alpine:init', () => {
       if (!chip) return;
       const left = chip.offsetLeft - strip.clientWidth / 2 + chip.clientWidth / 2;
       strip.scrollTo({ left, behavior: 'smooth' });
+    },
+
+    toggleView() {
+      this.view = this.view === 'overview' ? 'focus' : 'overview';
+      if (this.view === 'overview') {
+        this.stillKey = Date.now();
+        this.stillErrors = {};
+      }
+      this.$nextTick(() => window.scrollTo({ top: 0, behavior: 'smooth' }));
+    },
+
+    async focusCamera(id) {
+      if (String(id) !== String(this.activeId)) await this.selectCamera(id);
+      this.view = 'focus';
+      this.$nextTick(() => window.scrollTo({ top: 0, behavior: 'smooth' }));
+    },
+
+    stillSrc(cameraId) {
+      return `/api/cameras/${encodeURIComponent(cameraId)}/still.jpg?v=${this.stillKey}`;
     },
 
     async selectCamera(id) {

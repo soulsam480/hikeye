@@ -156,6 +156,7 @@ Events live in SQLite (`data/events.db`), snapshots in `data/events/<camera>/`.
 | `GET` | `/api/status` | Camera, recorder, vision state |
 | `GET` | `/api/cameras` | Camera list |
 | `POST` | `/api/cameras/:id/activate` | Switch camera |
+| `GET` | `/api/cameras/:id/still.jpg` | ISAPI still for the all-camera wall |
 | `GET` | `/api/snapshot.jpg?camera=1` | Single JPEG |
 | `GET` | `/stream.mjpeg?camera=1` | Live MJPEG |
 | `GET` | `/api/recordings?camera=1` | List recordings |
