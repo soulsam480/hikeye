@@ -124,6 +124,10 @@ CREATE INDEX events_camera_time ON events(camera_id, created_at DESC);
 
 ## Configuration
 
+> **Implementation update:** configuration now lives in `config.yaml`; `.env`
+> contains only `STREAM_PASS`, `DASHBOARD_PASSWORD`, and `VISION_API_KEY`. The
+> original environment-variable table below is historical.
+
 Reuse the existing `.env` names; add:
 
 | Variable | Default | Purpose |

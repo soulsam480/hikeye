@@ -8,7 +8,6 @@ from collections.abc import AsyncGenerator, AsyncIterator
 from contextlib import asynccontextmanager, suppress
 from pathlib import Path
 from typing import Any
-from urllib.parse import urlsplit
 
 from fastapi import FastAPI, HTTPException, Query, Request, Response
 from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse, StreamingResponse
@@ -220,7 +219,7 @@ def create_app(settings: Settings) -> FastAPI:
                 await asyncio.to_thread(hub.activate, camera)
             except UnknownCameraError as error:
                 raise HTTPException(status_code=404, detail="Unknown camera") from error
-        page = await asyncio.to_thread(render_dashboard, settings, hub, store, engine)
+        page = await asyncio.to_thread(render_dashboard, hub, store, engine)
         return HTMLResponse(page)
 
     @app.post("/ui/record/start")
@@ -310,7 +309,3 @@ def _is_authorized(request: Request, settings: Settings) -> bool:
     return secrets.compare_digest(username, settings.dashboard_user) and secrets.compare_digest(
         password, settings.dashboard_password
     )
-
-
-def _host_from_url(url: str) -> str:
-    return urlsplit(url).hostname or ""

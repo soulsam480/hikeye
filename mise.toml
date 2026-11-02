@@ -1,6 +1,18 @@
 [tools]
 python = "3.13"
 
+[tasks.setup]
+description = "Install Python + UI dependencies and build CSS"
+run = "uv sync --extra dev && npm install && npm run build:css"
+
+[tasks."css:build"]
+description = "Build the Tailwind + daisyUI stylesheet"
+run = "npm run build:css"
+
+[tasks."css:watch"]
+description = "Watch Tailwind templates and rebuild CSS"
+run = "npm run watch:css"
+
 [tasks.start]
 description = "Start the dashboard"
 run = "uv run netra serve"

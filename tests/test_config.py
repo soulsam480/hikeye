@@ -1,19 +1,38 @@
 from pathlib import Path
 
-from netra.config import Settings
+import yaml
+
+from netra.config import Settings, parse_env_text
 
 
-def test_parses_cameras_and_encodes_credentials() -> None:
-    settings = Settings.load(
-        env={
-            "STREAM_IP": "192.168.0.100",
-            "STREAM_USER": "admin",
-            "STREAM_PASS": "p@ss&x",
-            "CAMERAS": "1:Front Door,2:Backyard",
-            "STREAM_MODE": "decrypt",
-        },
-        env_file=None,
-        cwd=Path("/tmp/netra-config-test"),
+def _mapping(**overrides: object) -> dict:
+    data = {
+        "server": {"host": "127.0.0.1", "port": 8080},
+        "dvr": {"host": "192.168.0.100", "port": 554, "user": "admin", "password": "secret"},
+        "capture": {"mode": "decrypt", "stream": "sub", "fps": 10, "quality": 5},
+        "cameras": [
+            {"id": "1", "name": "Front Door", "channel": 1},
+            {"id": "2", "name": "Backyard", "channel": 2},
+        ],
+        "vision": {"backend": "mock"},
+        "events": {"db": "data/events.db", "dir": "data/events"},
+        "recording": {"dir": "recordings"},
+    }
+    data.update(overrides)
+    return data
+
+
+def test_cameras_and_urls_from_yaml() -> None:
+    settings = Settings.from_mapping(
+        _mapping(
+            dvr={
+                "host": "192.168.0.100",
+                "port": 554,
+                "user": "admin",
+                "password": "p@ss&x",
+            }
+        ),
+        root=Path("/tmp/netra-config-test"),
     )
 
     assert [camera.id for camera in settings.cameras] == ["1", "2"]
@@ -24,67 +43,60 @@ def test_parses_cameras_and_encodes_credentials() -> None:
         == "rtsp://admin:p%40ss%26x@192.168.0.100:554/Streaming/Channels/102"
     )
     assert settings.stream_mode == "decrypt"
-    assert settings.verification_code == ""
 
 
 def test_main_stream_uses_channel_01() -> None:
-    settings = Settings.load(
-        env={
-            "STREAM_IP": "10.0.0.5",
-            "STREAM_USER": "admin",
-            "STREAM_PASS": "secret",
-            "CAMERAS": "1:Front,2:Back",
-            "STREAM_STREAM": "main",
-        },
-        env_file=None,
-        cwd=Path("/tmp/netra-config-test"),
+    settings = Settings.from_mapping(
+        _mapping(capture={"mode": "decrypt", "stream": "main"}),
+        root=Path("/tmp/netra-config-test"),
     )
 
     assert [camera.stream_id for camera in settings.cameras] == ["101", "201"]
     assert settings.stream_kind == "main"
 
 
-def test_single_camera_defaults_from_stream_path() -> None:
-    settings = Settings.load(
-        env={
-            "STREAM_IP": "192.168.0.100",
-            "STREAM_USER": "admin",
-            "STREAM_PASS": "secret",
-            "STREAM_PATH": "/Streaming/Channels/302",
-            "CAMERA_NAME": "Garage",
-        },
-        env_file=None,
-        cwd=Path("/tmp/netra-config-test"),
-    )
-
-    assert len(settings.cameras) == 1
-    assert settings.cameras[0].id == "3"
-    assert settings.cameras[0].name == "Garage"
-    assert settings.cameras[0].stream_id == "302"
-
-
-def test_invalid_mode_falls_back_to_rtsp() -> None:
-    settings = Settings.load(
-        env={"STREAM_IP": "192.168.0.100", "STREAM_MODE": "banana"},
-        env_file=None,
-        cwd=Path("/tmp/netra-config-test"),
+def test_invalid_values_fall_back() -> None:
+    settings = Settings.from_mapping(
+        _mapping(
+            capture={"mode": "banana", "stream": "nope"},
+            vision={"backend": "banana"},
+        ),
+        root=Path("/tmp/netra-config-test"),
     )
 
     assert settings.stream_mode == "rtsp"
+    assert settings.stream_kind == "sub"
+    assert settings.vision_backend == "mock"
 
 
-def test_verification_code_is_read_from_secret_key() -> None:
+def test_load_expands_secrets_from_environment(tmp_path: Path) -> None:
+    config = {
+        "server": {"dashboard_password": "${DASHBOARD_PASSWORD}"},
+        "dvr": {"host": "10.0.0.5", "user": "admin", "password": "${STREAM_PASS}"},
+        "capture": {"mode": "decrypt"},
+        "cameras": [{"id": "1", "name": "Test", "channel": 1}],
+        "vision": {"backend": "openai", "api_key": "${VISION_API_KEY}"},
+        "events": {"db": "data/events.db", "dir": "data/events"},
+        "recording": {"dir": "recordings"},
+    }
+    path = tmp_path / "config.yaml"
+    path.write_text(yaml.safe_dump(config))
+    (tmp_path / ".env").write_text("STREAM_PASS=p@ss&x\n")
+
     settings = Settings.load(
-        env={
-            "STREAM_IP": "192.168.0.100",
-            "STREAM_SECRET_KEY": "ABC123",
-            "VISION_BACKEND": "liquid",
-            "VISION_MODEL": "LiquidAI/LFM2.5-VL-3B",
-        },
-        env_file=None,
-        cwd=Path("/tmp/netra-config-test"),
+        config_file=path,
+        env={"DASHBOARD_PASSWORD": "dash", "VISION_API_KEY": "vision-key"},
+        cwd=tmp_path,
     )
 
-    assert settings.verification_code == "ABC123"
-    assert settings.vision_backend == "liquid"
-    assert settings.vision_model == "LiquidAI/LFM2.5-VL-3B"
+    assert settings.dashboard_password == "dash"
+    assert settings.vision_api_key == "vision-key"
+    assert "p%40ss%26x" in settings.cameras[0].stream_url
+    assert settings.root == tmp_path
+
+
+def test_parse_env_text_preserves_special_characters() -> None:
+    env = parse_env_text("STREAM_PASS=p@ss&word$*\nDASHBOARD_PASSWORD='two words'\n")
+
+    assert env["STREAM_PASS"] == "p@ss&word$*"
+    assert env["DASHBOARD_PASSWORD"] == "two words"

@@ -1,0 +1,49 @@
+@import "tailwindcss";
+@plugin "daisyui" {
+  themes: false;
+}
+@plugin "daisyui/theme" {
+  name: "netra";
+  default: true;
+  prefersdark: true;
+  color-scheme: dark;
+
+  --color-base-100: #0d141d;
+  --color-base-200: #111a25;
+  --color-base-300: #1b2735;
+  --color-base-content: #e6edf6;
+  --color-primary: #35e0b0;
+  --color-primary-content: #062019;
+  --color-secondary: #6ea8fe;
+  --color-secondary-content: #071426;
+  --color-accent: #ffc857;
+  --color-accent-content: #241a00;
+  --color-neutral: #1b2634;
+  --color-neutral-content: #dbe6f3;
+  --color-info: #67c7ff;
+  --color-info-content: #04121c;
+  --color-success: #35e0b0;
+  --color-success-content: #062019;
+  --color-warning: #ffc857;
+  --color-warning-content: #241a00;
+  --color-error: #ff5c77;
+  --color-error-content: #2a0710;
+
+  --radius-selector: 0.5rem;
+  --radius-field: 0.5rem;
+  --radius-box: 0.75rem;
+  --size-selector: 0.25rem;
+  --size-field: 0.25rem;
+  --border: 1px;
+  --depth: 0;
+  --noise: 0;
+}
+
+@source "../netra/templates";
+@source "../netra/static/app.js";
+
+@layer base {
+  [x-cloak] {
+    display: none !important;
+  }
+}

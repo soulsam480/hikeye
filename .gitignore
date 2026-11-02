@@ -19,3 +19,6 @@ recordings/
 .codemogger/
 .memsearch/
 .DS_Store
+
+# UI build
+node_modules/

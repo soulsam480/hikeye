@@ -1,0 +1,270 @@
+<!doctype html>
+<html lang="en" data-theme="netra">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#0d141d" />
+    <title>Netra · Camera dashboard</title>
+    <link rel="icon" href="/static/favicon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="/static/styles.css" />
+    <script>
+      window.NETRA = {{ initial | tojson }};
+    </script>
+    <script defer src="/static/app.js"></script>
+    <script defer src="/static/vendor/alpine.min.js"></script>
+  </head>
+
+  <body class="min-h-screen bg-base-200 text-base-content" x-data="netra()" x-init="init()">
+    <header
+      class="navbar sticky top-0 z-30 min-h-14 border-b border-base-300 bg-base-100/90 px-4 backdrop-blur lg:px-8"
+    >
+      <div class="navbar-start gap-3">
+        <svg viewBox="0 0 24 24" class="h-7 w-7 text-primary" fill="none" stroke="currentColor" stroke-width="1.7">
+          <path d="M12 5c-5 0-8.5 4.4-9.7 6.2a1.4 1.4 0 0 0 0 1.6C3.5 14.6 7 19 12 19s8.5-4.4 9.7-6.2a1.4 1.4 0 0 0 0-1.6C20.5 9.4 17 5 12 5Z" />
+          <circle cx="12" cy="12" r="3.2" />
+        </svg>
+        <span class="text-sm font-bold tracking-[0.22em]">NETRA</span>
+        <span class="badge badge-ghost badge-sm hidden sm:inline-flex">cctv</span>
+      </div>
+      <div class="navbar-end gap-3">
+        <span class="hidden font-mono text-xs opacity-40 sm:inline" x-text="fmtClock(now)"></span>
+        <span class="badge badge-sm gap-1.5" :class="live ? 'badge-success' : 'badge-warning'">
+          <span class="status status-xs" :class="live ? 'status-success' : 'status-warning'"></span>
+          <span x-text="live ? 'live' : camera.state"></span>
+        </span>
+      </div>
+    </header>
+
+    <main class="mx-auto w-full max-w-[1600px] space-y-4 p-4 lg:p-6">
+      <nav class="flex gap-2 overflow-x-auto pb-1" aria-label="Cameras">
+        <template x-for="cam in cameras" :key="cam.id">
+          <button
+            class="btn btn-sm shrink-0"
+            :class="String(cam.id) === String(activeId) ? 'btn-primary' : 'btn-ghost border border-base-300'"
+            @click="selectCamera(cam.id)"
+          >
+            <span class="font-mono text-[10px] opacity-50" x-text="String(cam.channel).padStart(2, '0')"></span>
+            <span x-text="cam.name"></span>
+          </button>
+        </template>
+      </nav>
+
+      <div class="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,2.2fr)_minmax(320px,1fr)]">
+        <section class="card overflow-hidden border border-base-300 bg-base-100">
+          <figure class="relative aspect-video bg-black" x-ref="videoWrap">
+            <img :src="streamSrc" alt="Live camera feed" class="h-full w-full object-contain" />
+            <div class="absolute inset-x-0 top-0 flex items-start justify-between p-3">
+              <span class="badge badge-error gap-1.5" :class="!live && 'badge-ghost'">
+                <span class="status status-xs" :class="live ? 'status-error' : 'status-warning'"></span>
+                <span x-text="live ? 'LIVE' : camera.state"></span>
+              </span>
+              <span class="badge badge-neutral" x-text="resolution"></span>
+            </div>
+
+            <div class="absolute inset-0 grid place-items-center" x-show="!live" x-cloak>
+              <div class="flex flex-col items-center gap-3 rounded-box bg-base-100/80 px-6 py-5 text-center backdrop-blur">
+                <span class="loading loading-spinner loading-md text-primary"></span>
+                <span class="max-w-xs text-sm opacity-70" x-text="camera.error || 'Connecting to camera…'"></span>
+              </div>
+            </div>
+
+            <div class="absolute inset-x-0 bottom-0 flex justify-center p-3">
+              <div class="join border border-base-300 bg-base-100/80 backdrop-blur">
+                <button class="btn btn-ghost btn-sm join-item" @click="snapshot()">Snapshot</button>
+                <button
+                  class="btn btn-sm join-item"
+                  :class="recording ? 'btn-error' : 'btn-ghost'"
+                  :disabled="busy"
+                  @click="toggleRecord()"
+                >
+                  <span class="status status-xs" :class="recording ? 'status-error' : 'status-success'"></span>
+                  <span x-text="recording ? 'Stop' : 'Record'"></span>
+                </button>
+                <button class="btn btn-ghost btn-sm join-item" @click="fullscreen()">Fullscreen</button>
+              </div>
+            </div>
+          </figure>
+
+          <div class="grid grid-cols-2 divide-x divide-base-300 border-t border-base-300 sm:grid-cols-4">
+            <div class="p-3">
+              <div class="text-[10px] uppercase tracking-wider opacity-40">Camera</div>
+              <div class="truncate text-sm font-medium" x-text="camera.name"></div>
+            </div>
+            <div class="p-3">
+              <div class="text-[10px] uppercase tracking-wider opacity-40">Uptime</div>
+              <div class="font-mono text-sm" x-text="fmtDuration(camera.uptimeSeconds)"></div>
+            </div>
+            <div class="p-3">
+              <div class="text-[10px] uppercase tracking-wider opacity-40">Viewers</div>
+              <div class="font-mono text-sm" x-text="camera.viewers"></div>
+            </div>
+            <div class="p-3">
+              <div class="text-[10px] uppercase tracking-wider opacity-40">Bitrate</div>
+              <div class="font-mono text-sm" x-text="`${camera.bitrateKbps} kbps`"></div>
+            </div>
+          </div>
+        </section>
+
+        <aside class="space-y-4">
+          <section class="card border border-base-300 bg-base-100">
+            <div class="card-body gap-3 p-4">
+              <div class="flex items-center justify-between">
+                <h2 class="card-title text-xs uppercase tracking-wider opacity-50">Stream health</h2>
+                <span class="badge badge-ghost badge-sm" x-text="camera.transport"></span>
+              </div>
+              <div class="stats stats-vertical bg-base-200">
+                <div class="stat py-2">
+                  <div class="stat-title text-xs">Status</div>
+                  <div class="stat-value text-base" :class="live ? 'text-success' : 'text-warning'" x-text="camera.state"></div>
+                </div>
+                <div class="stat py-2">
+                  <div class="stat-title text-xs">Resolution</div>
+                  <div class="stat-value text-base" x-text="resolution"></div>
+                </div>
+                <div class="stat py-2">
+                  <div class="stat-title text-xs">Frame rate</div>
+                  <div class="stat-value text-base" x-text="`${camera.fps} fps`"></div>
+                </div>
+                <div class="stat py-2">
+                  <div class="stat-title text-xs">Decryption</div>
+                  <div class="stat-value text-base" x-text="`${camera.decryption.decryptedNals} / ${camera.decryption.flaggedNals}`"></div>
+                  <div class="stat-desc">NAL units</div>
+                </div>
+              </div>
+              <div class="alert alert-error text-xs" x-show="camera.error" x-cloak>
+                <span x-text="camera.error"></span>
+              </div>
+            </div>
+          </section>
+
+          <section class="card border border-base-300 bg-base-100">
+            <div class="card-body gap-3 p-4">
+              <div class="flex items-center justify-between">
+                <h2 class="card-title text-xs uppercase tracking-wider opacity-50">Recording</h2>
+                <span class="badge badge-sm" :class="recording ? 'badge-error' : 'badge-ghost'" x-text="recording ? 'recording' : 'idle'"></span>
+              </div>
+              <div class="space-y-2 text-sm">
+                <div class="flex justify-between gap-3">
+                  <span class="opacity-40">File</span>
+                  <span class="truncate font-mono text-xs" x-text="recorder.name || '—'"></span>
+                </div>
+                <div class="flex justify-between">
+                  <span class="opacity-40">Elapsed</span>
+                  <span class="font-mono text-xs" x-text="fmtDuration(recorder.durationSeconds)"></span>
+                </div>
+                <div class="flex justify-between">
+                  <span class="opacity-40">Size</span>
+                  <span class="font-mono text-xs" x-text="fmtBytes(recorder.bytes)"></span>
+                </div>
+              </div>
+              <button
+                class="btn btn-block"
+                :class="recording ? 'btn-error' : 'btn-primary'"
+                :disabled="busy"
+                @click="toggleRecord()"
+                x-text="recording ? 'Stop recording' : 'Start recording'"
+              ></button>
+              <p class="text-xs opacity-40">Copies the decrypted H.264 stream without re-encoding.</p>
+            </div>
+          </section>
+
+          <section class="card border border-base-300 bg-base-100">
+            <div class="card-body gap-3 p-4">
+              <div class="flex items-center justify-between">
+                <h2 class="card-title text-xs uppercase tracking-wider opacity-50">Vision</h2>
+                <span class="badge badge-sm" :class="vision.lastError ? 'badge-error' : 'badge-success'" x-text="vision.lastError ? 'error' : 'ready'"></span>
+              </div>
+              <div>
+                <div class="font-mono text-xs" x-text="visionLabel"></div>
+                <div class="mt-1 text-xs opacity-40" x-text="vision.reasoning === 'disabled' ? 'reasoning disabled' : 'reasoning enabled'"></div>
+              </div>
+              <div class="text-xs leading-relaxed text-error" x-show="vision.lastError" x-cloak x-text="vision.lastError"></div>
+            </div>
+          </section>
+        </aside>
+      </div>
+
+      <section class="card border border-base-300 bg-base-100">
+        <div class="card-body p-0">
+          <div class="flex items-center justify-between p-4">
+            <h2 class="card-title text-xs uppercase tracking-wider opacity-50">Recordings</h2>
+            <button class="btn btn-ghost btn-xs" @click="loadRecordings()">Refresh</button>
+          </div>
+          <div class="overflow-x-auto">
+            <table class="table table-sm">
+              <thead>
+                <tr>
+                  <th>File</th>
+                  <th>Size</th>
+                  <th>Date</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                <template x-for="item in recordings" :key="item.name">
+                  <tr>
+                    <td class="font-mono text-xs" x-text="item.name"></td>
+                    <td class="text-xs" x-text="fmtBytes(item.bytes)"></td>
+                    <td class="text-xs opacity-50" x-text="fmtTime(item.modified_at)"></td>
+                    <td class="text-right">
+                      <div class="join">
+                        <button class="btn btn-ghost btn-xs join-item" @click="play(item)">Play</button>
+                        <a class="btn btn-ghost btn-xs join-item" :href="`/api/recordings/${encodeURIComponent(item.name)}?camera=${activeId}`" download>Download</a>
+                        <button class="btn btn-ghost btn-xs join-item text-error" @click="remove(item)">Delete</button>
+                      </div>
+                    </td>
+                  </tr>
+                </template>
+              </tbody>
+            </table>
+          </div>
+          <div class="p-6 text-center text-sm opacity-40" x-show="!recordings.length" x-cloak>No recordings yet.</div>
+        </div>
+      </section>
+
+      <section class="card border border-base-300 bg-base-100">
+        <div class="card-body gap-4 p-4">
+          <div class="flex items-center justify-between">
+            <h2 class="card-title text-xs uppercase tracking-wider opacity-50">Vision events</h2>
+            <span class="badge badge-ghost badge-sm" x-text="visionLabel"></span>
+          </div>
+          <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
+            <template x-for="event in events" :key="event.id">
+              <article class="card overflow-hidden border border-base-300 bg-base-200">
+                <figure>
+                  <img :src="`/api/events/${event.id}/snapshot`" class="aspect-video w-full object-cover" loading="lazy" alt="" />
+                </figure>
+                <div class="card-body gap-1 p-3">
+                  <div class="flex items-center gap-2">
+                    <span class="badge badge-primary badge-sm" x-text="event.event_type"></span>
+                    <span class="text-xs opacity-40" x-text="`${event.people_count} people · ${event.vehicles_count} vehicles`"></span>
+                  </div>
+                  <p class="text-sm leading-snug" x-text="event.description"></p>
+                  <div class="font-mono text-[11px] opacity-30" x-text="`${fmtTime(event.created_at)} · ${Math.round(event.confidence * 100)}% · ${(event.model || '—').split('/').pop()}`"></div>
+                </div>
+              </article>
+            </template>
+          </div>
+          <div class="py-6 text-center text-sm opacity-40" x-show="!events.length" x-cloak>
+            No events yet. Motion will trigger the vision model.
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <dialog class="modal" x-ref="player">
+      <div class="modal-box max-w-4xl">
+        <h3 class="font-mono text-sm opacity-50" x-text="playerTitle"></h3>
+        <video class="mt-3 w-full rounded-box bg-black" :src="playerSrc" controls autoplay></video>
+        <div class="modal-action">
+          <button class="btn btn-sm" @click="closePlayer()">Close</button>
+        </div>
+      </div>
+      <form method="dialog" class="modal-backdrop"><button>close</button></form>
+    </dialog>
+
+    <div class="toast toast-end z-50" x-show="toast" x-cloak>
+      <div class="alert" :class="toastKind === 'error' ? 'alert-error' : 'alert-success'" x-text="toast"></div>
+    </div>
+  </body>
+</html>

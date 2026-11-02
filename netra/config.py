@@ -1,39 +1,16 @@
 from __future__ import annotations
 
 import os
+import re
 from dataclasses import dataclass, field
 from pathlib import Path
-from urllib.parse import quote
+from typing import Any
+from urllib.parse import quote, urlsplit
 
-from dotenv import dotenv_values
+import yaml
 
-DEFAULT_STREAM_PATH = "/Streaming/Channels/102"
-
-
-def _as_int(value: str | None, default: int, minimum: int, maximum: int) -> int:
-    if value is None:
-        return default
-    try:
-        parsed = int(value)
-    except (TypeError, ValueError):
-        return default
-    return max(minimum, min(maximum, parsed))
-
-
-def _as_float(value: str | None, default: float, minimum: float, maximum: float) -> float:
-    if value is None:
-        return default
-    try:
-        parsed = float(value)
-    except (TypeError, ValueError):
-        return default
-    return max(minimum, min(maximum, parsed))
-
-
-def _as_bool(value: str | None, default: bool) -> bool:
-    if value is None:
-        return default
-    return value.strip().lower() not in {"0", "false", "no", "off"}
+CONFIG_FILE = "config.yaml"
+ENV_TOKEN = re.compile(r"\$\{([A-Z0-9_]+)\}")
 
 
 @dataclass(frozen=True)
@@ -54,23 +31,24 @@ class Settings:
     dashboard_user: str = "admin"
     dashboard_password: str = ""
 
-    stream_mode: str = "rtsp"  # decrypt | rtsp | snapshot
-    stream_kind: str = "sub"  # sub | main
-    stream_fps: int = 10
-    stream_quality: int = 5
+    stream_mode: str = "rtsp"
+    stream_kind: str = "sub"
     stream_ip: str = ""
+    stream_port: int = 554
     stream_user: str = ""
     stream_pass: str = ""
+    stream_transport: str = "tcp"
+    stream_fps: int = 10
+    stream_quality: int = 5
     verification_code: str = ""
     cameras: list[CameraConfig] = field(default_factory=list)
 
     recordings_dir: Path = Path("recordings")
-    data_dir: Path = Path("data")
     events_db: Path = Path("data/events.db")
     events_dir: Path = Path("data/events")
     event_retention_days: int = 30
 
-    vision_backend: str = "mock"  # mock | openai
+    vision_backend: str = "mock"
     vision_base_url: str = "http://127.0.0.1:8000/v1"
     vision_api_key: str = ""
     vision_model: str = "lfm2.5-vl-3b"
@@ -90,176 +68,190 @@ class Settings:
     @classmethod
     def load(
         cls,
+        config_file: Path | None = None,
         env: dict[str, str] | None = None,
-        env_file: Path | None = None,
         cwd: Path | None = None,
     ) -> Settings:
-        """Load settings from a dotenv file plus process overrides.
+        root = Path(cwd) if cwd is not None else Path(__file__).resolve().parents[1]
+        env_file = root / ".env"
+        file_env = parse_env_text(env_file.read_text()) if env_file.exists() else {}
+        merged = {**file_env, **(os.environ if env is None else env)}
 
-        When `env` is supplied it is treated as the complete override layer
-        (process env is not consulted), which keeps tests hermetic.
-        """
-        if env_file is None and env is None:
-            env_file = _default_env_file()
-
-        file_env: dict[str, str] = {}
-        if env_file is not None and Path(env_file).exists():
-            file_env = {
-                key: value for key, value in dotenv_values(env_file).items() if value is not None
-            }
-
-        overrides = env if env is not None else os.environ
-        merged = {**file_env, **overrides}
-
-        def get(key: str, default: str | None = None) -> str | None:
-            value = merged.get(key)
-            return value if value not in (None, "") else default
-
-        root = (
-            Path(cwd)
-            if cwd is not None
-            else (Path(env_file).resolve().parent if env_file is not None else Path.cwd())
+        configured = config_file or (
+            Path(merged["NETRA_CONFIG"]) if merged.get("NETRA_CONFIG") else root / CONFIG_FILE
         )
+        path = configured if configured.is_absolute() else root / configured
+        if not path.exists():
+            raise FileNotFoundError(f"Config file not found: {path}")
 
-        host_ip = get("STREAM_IP", "") or ""
-        stream_user = get("STREAM_USER", "") or ""
-        stream_pass = get("STREAM_PASS", "") or ""
-        stream_port = _as_int(get("STREAM_PORT"), 554, 1, 65535)
-        stream_kind = "main" if (get("STREAM_STREAM", "sub") or "sub").lower() == "main" else "sub"
+        data = yaml.safe_load(path.read_text()) or {}
+        return cls.from_mapping(_expand(data, merged), root=root)
+
+    @classmethod
+    def from_mapping(cls, data: dict, root: Path | None = None) -> Settings:
+        root = root or Path.cwd()
+        server = data.get("server") or {}
+        dvr = data.get("dvr") or {}
+        capture = data.get("capture") or {}
+        vision = data.get("vision") or {}
+        events = data.get("events") or {}
+        recording = data.get("recording") or {}
+
+        stream_kind = "main" if str(capture.get("stream", "sub")).lower() == "main" else "sub"
         suffix = "01" if stream_kind == "main" else "02"
+        stream_ip = str(dvr.get("host") or "")
+        stream_user = str(dvr.get("user") or "")
+        stream_pass = str(dvr.get("password") or "")
+        stream_port = _as_int(dvr.get("port"), 554, 1, 65535)
 
-        stream_path = get("STREAM_PATH")
-        if stream_path is None:
-            stream_path = (
-                f"/Streaming/Channels/{suffix}"
-                if stream_kind == "sub"
-                else "/Streaming/Channels/101"
-            )
-
-        stream_url = get("STREAM_URL") or _build_rtsp_url(
-            host_ip, stream_user, stream_pass, stream_port, stream_path
-        )
-
-        if not host_ip:
-            try:
-                from urllib.parse import urlparse
-
-                host_ip = urlparse(stream_url).hostname or ""
-            except ValueError:
-                host_ip = ""
-
-        raw_cameras = get("CAMERAS", "") or ""
-        requested: list[tuple[int, str]] = []
-        if raw_cameras:
-            for entry in raw_cameras.split(","):
-                entry = entry.strip()
-                if not entry:
-                    continue
-                head, _, tail = entry.partition(":")
-                try:
-                    channel = int(head.strip())
-                except ValueError:
-                    continue
-                if channel < 1:
-                    continue
-                requested.append((channel, tail.strip() or f"Camera {channel}"))
-
-        if not requested:
-            match = _channel_number(stream_path)
-            requested.append(
-                (
-                    int(get("CAMERA_CHANNEL", "0") or 0) or match,
-                    get("CAMERA_NAME", "Front Camera") or "Front Camera",
+        cameras = [
+            _camera(entry, suffix, stream_ip, stream_user, stream_pass, stream_port)
+            for entry in (data.get("cameras") or [])
+            if entry.get("channel")
+        ]
+        if not cameras:
+            cameras = [
+                _camera(
+                    {"id": "1", "name": "Camera", "channel": 1},
+                    suffix,
+                    stream_ip,
+                    stream_user,
+                    stream_pass,
+                    stream_port,
                 )
-            )
+            ]
 
-        cameras: list[CameraConfig] = []
-        for channel, name in requested:
-            stream_id = f"{channel}{suffix}"
-            path = f"/Streaming/Channels/{stream_id}"
-            cameras.append(
-                CameraConfig(
-                    id=str(channel),
-                    channel=channel,
-                    name=name,
-                    stream_id=stream_id,
-                    stream_url=_build_rtsp_url(
-                        host_ip, stream_user, stream_pass, stream_port, path
-                    ),
-                    snapshot_url=f"http://{host_ip}/ISAPI/Streaming/channels/{stream_id}/picture",
-                )
-            )
-
-        # Explicit single-camera overrides.
-        if len(cameras) == 1 and get("STREAM_URL"):
-            first = cameras[0]
-            cameras[0] = CameraConfig(
-                id=first.id,
-                channel=first.channel,
-                name=first.name,
-                stream_id=first.stream_id,
-                stream_url=stream_url,
-                snapshot_url=get("SNAPSHOT_URL") or first.snapshot_url,
-            )
-
-        raw_mode = (get("STREAM_MODE", "rtsp") or "rtsp").lower()
-        stream_mode = raw_mode if raw_mode in {"decrypt", "rtsp", "snapshot"} else "rtsp"
-
-        recordings_dir = root / (get("RECORDINGS_DIR", "recordings") or "recordings")
-        data_dir = root / (get("DATA_DIR", "data") or "data")
+        mode = str(capture.get("mode", "rtsp")).lower()
+        backend = str(vision.get("backend", "mock")).lower()
 
         return cls(
             root=root,
-            host=get("HOST", "127.0.0.1") or "127.0.0.1",
-            port=_as_int(get("PORT"), 8080, 1, 65535),
-            dashboard_user=get("DASHBOARD_USER", "admin") or "admin",
-            dashboard_password=get("DASHBOARD_PASSWORD", "") or "",
-            stream_mode=stream_mode,
+            host=str(server.get("host") or "127.0.0.1"),
+            port=_as_int(server.get("port"), 8080, 1, 65535),
+            dashboard_user=str(server.get("dashboard_user") or "admin"),
+            dashboard_password=str(server.get("dashboard_password") or ""),
+            stream_mode=mode if mode in {"decrypt", "rtsp", "snapshot"} else "rtsp",
             stream_kind=stream_kind,
-            stream_fps=_as_int(get("STREAM_FPS"), 10, 1, 30),
-            stream_quality=_as_int(get("STREAM_QUALITY"), 5, 2, 31),
-            stream_ip=host_ip,
+            stream_ip=stream_ip,
+            stream_port=stream_port,
             stream_user=stream_user,
             stream_pass=stream_pass,
-            verification_code=get("STREAM_SECRET_KEY", "")
-            or get("STREAM_VERIFICATION_CODE", "")
-            or "",
+            stream_transport=(
+                "udp" if str(capture.get("transport", "tcp")).lower() == "udp" else "tcp"
+            ),
+            stream_fps=_as_int(capture.get("fps"), 10, 1, 30),
+            stream_quality=_as_int(capture.get("quality"), 5, 2, 31),
+            verification_code=str(capture.get("verification_code") or ""),
             cameras=cameras,
-            recordings_dir=recordings_dir,
-            data_dir=data_dir,
-            events_db=data_dir / "events.db",
-            events_dir=data_dir / "events",
-            event_retention_days=_as_int(get("EVENT_RETENTION_DAYS"), 30, 1, 3650),
-            vision_backend=(get("VISION_BACKEND", "mock") or "mock").lower(),
-            vision_base_url=get("VISION_BASE_URL", "http://127.0.0.1:8000/v1")
-            or "http://127.0.0.1:8000/v1",
-            vision_api_key=get("VISION_API_KEY", "") or "",
-            vision_model=get("VISION_MODEL", "lfm2.5-vl-3b") or "lfm2.5-vl-3b",
-            vision_interval=_as_float(get("VISION_INTERVAL"), 2.0, 0.5, 60.0),
-            vision_cooldown=_as_int(get("VISION_COOLDOWN"), 20, 1, 3600),
-            vision_max_tokens=_as_int(get("VISION_MAX_TOKENS"), 320, 64, 4096),
-            vision_min_confidence=_as_float(get("VISION_MIN_CONFIDENCE"), 0.75, 0.0, 1.0),
-            vision_disable_reasoning=_as_bool(get("VISION_DISABLE_REASONING"), True),
-            event_webhook_url=get("EVENT_WEBHOOK_URL", "") or "",
-            ffmpeg_path=get("FFMPEG_PATH", "ffmpeg") or "ffmpeg",
+            recordings_dir=_path(root, recording.get("dir"), "recordings"),
+            events_db=_path(root, events.get("db"), "data/events.db"),
+            events_dir=_path(root, events.get("dir"), "data/events"),
+            event_retention_days=_as_int(events.get("retention_days"), 30, 1, 3650),
+            vision_backend=backend if backend in {"mock", "openai"} else "mock",
+            vision_base_url=str(vision.get("base_url") or "http://127.0.0.1:8000/v1"),
+            vision_api_key=str(vision.get("api_key") or ""),
+            vision_model=str(vision.get("model") or "lfm2.5-vl-3b"),
+            vision_interval=_as_float(vision.get("interval"), 2.0, 0.5, 60.0),
+            vision_cooldown=_as_int(vision.get("cooldown"), 20, 1, 3600),
+            vision_max_tokens=_as_int(vision.get("max_tokens"), 320, 64, 4096),
+            vision_min_confidence=_as_float(vision.get("min_confidence"), 0.75, 0.0, 1.0),
+            vision_disable_reasoning=_as_bool(vision.get("disable_reasoning"), True),
+            event_webhook_url=str(vision.get("webhook_url") or ""),
+            ffmpeg_path=str(data.get("ffmpeg") or "ffmpeg"),
         )
 
 
-def _default_env_file() -> Path:
-    # python/netra/config.py -> python/netra -> python -> repo root
-    return Path(__file__).resolve().parents[1] / ".env"
+def _camera(
+    entry: dict,
+    suffix: str,
+    host: str,
+    user: str,
+    password: str,
+    port: int,
+) -> CameraConfig:
+    channel = _as_int(entry.get("channel"), 1, 1, 99)
+    stream_id = str(entry.get("stream_id") or f"{channel}{suffix}")
+    stream_path = str(entry.get("stream_path") or f"/Streaming/Channels/{stream_id}")
+    return CameraConfig(
+        id=str(entry.get("id") or channel),
+        channel=channel,
+        name=str(entry.get("name") or f"Camera {channel}"),
+        stream_id=stream_id,
+        stream_url=_build_rtsp_url(host, user, password, port, stream_path),
+        snapshot_url=f"http://{host}/ISAPI/Streaming/channels/{stream_id}/picture",
+    )
 
 
 def _build_rtsp_url(host: str, user: str, password: str, port: int, stream_path: str) -> str:
-    auth = ""
-    if user:
-        auth = f"{quote(user, safe='')}:{quote(password, safe='')}@"
+    auth = f"{quote(user, safe='')}:{quote(password, safe='')}@" if user else ""
     path = stream_path if stream_path.startswith("/") else f"/{stream_path}"
     return f"rtsp://{auth}{host}:{port}{path}"
 
 
-def _channel_number(stream_path: str) -> int:
-    digits = "".join(ch for ch in stream_path if ch.isdigit())
-    if not digits:
-        return 1
-    return max(1, int(digits) // 100)
+def _expand(value: object, env: dict[str, str]) -> Any:
+    if isinstance(value, str):
+        return ENV_TOKEN.sub(lambda match: env.get(match.group(1), ""), value)
+    if isinstance(value, dict):
+        return {key: _expand(item, env) for key, item in value.items()}
+    if isinstance(value, list):
+        return [_expand(item, env) for item in value]
+    return value
+
+
+def _path(root: Path, value: object, fallback: str) -> Path:
+    return root / (str(value) if value else fallback)
+
+
+def _as_int(value: object, default: int, minimum: int, maximum: int) -> int:
+    if not isinstance(value, (int, float, str)):
+        return default
+    try:
+        parsed = int(value)
+    except (TypeError, ValueError):
+        return default
+    return max(minimum, min(maximum, parsed))
+
+
+def _as_float(value: object, default: float, minimum: float, maximum: float) -> float:
+    if not isinstance(value, (int, float, str)):
+        return default
+    try:
+        parsed = float(value)
+    except (TypeError, ValueError):
+        return default
+    return max(minimum, min(maximum, parsed))
+
+
+def _as_bool(value: object, default: bool) -> bool:
+    if value is None:
+        return default
+    if isinstance(value, bool):
+        return value
+    return str(value).strip().lower() not in {"0", "false", "no", "off"}
+
+
+def parse_env_text(text: str) -> dict[str, str]:
+    """Parse dotenv syntax, preserving special characters in secrets."""
+    values: dict[str, str] = {}
+    for raw_line in text.splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, value = line.split("=", 1)
+        value = value.strip()
+        if len(value) >= 2 and value[0] == value[-1] and value[0] in {"'", '"'}:
+            value = value[1:-1]
+        values[key.strip()] = value
+    return values
+
+
+def redact_url(value: str) -> str:
+    try:
+        parts = urlsplit(value)
+        if parts.username or parts.password:
+            host = parts.hostname or ""
+            port = f":{parts.port}" if parts.port else ""
+            return parts._replace(netloc=f"***:***@{host}{port}").geturl()
+        return value
+    except ValueError:
+        return "rtsp://<camera>"

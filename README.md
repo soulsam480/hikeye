@@ -23,6 +23,7 @@ No cloud, no hosted inference, no accounts.
 - A Hikvision / HiLook / EZVIZ DVR or NVR with an **admin** account
 - An OpenAI-compatible vision endpoint (vLLM, llama.cpp server, LM Studio, …)
   for real events; `mock` works without one
+- Node 24 only to rebuild the CSS (`npm install && npm run build:css`)
 
 ## Install
 
@@ -30,7 +31,7 @@ No cloud, no hosted inference, no accounts.
 uv sync --extra dev
 ```
 
-The app reads the repository-root `.env` by default. Copy the example if needed:
+Copy the secrets example and set the camera password:
 
 ```bash
 cp .env.example .env
@@ -38,16 +39,40 @@ cp .env.example .env
 
 ## Configure
 
+`.env` holds **secrets only**:
+
 ```dotenv
-STREAM_IP=192.168.0.100
-STREAM_USER=admin
-STREAM_PASS=your-password
-
-CAMERAS=1:Front Door,2:Backyard,3:Garage,4:Driveway,5:Side,6:Porch,7:Office
-
-STREAM_MODE=decrypt
-STREAM_STREAM=sub
+STREAM_PASS=your-camera-password
+DASHBOARD_PASSWORD=
+VISION_API_KEY=
 ```
+
+Everything else lives in `config.yaml`:
+
+```yaml
+dvr:
+  host: 192.168.0.100
+  user: admin
+  password: ${STREAM_PASS}
+
+capture:
+  mode: decrypt # decrypt | rtsp | snapshot
+  stream: sub # sub (xx2) | main (xx1)
+
+cameras:
+  - { id: "1", name: Front Door, channel: 1 }
+  - { id: "2", name: Backyard, channel: 2 }
+
+vision:
+  backend: openai
+  base_url: http://127.0.0.1:11234/v1
+  model: LiquidAI/LFM3-VL-2B-MLX-4bit
+  disable_reasoning: true
+  min_confidence: 0.75
+```
+
+`${VAR}` values are expanded from `.env` or the process environment. Point at a
+different file with `NETRA_CONFIG=/path/to/config.yaml`.
 
 Then verify the DVR, credentials, verification code and first camera:
 
@@ -62,7 +87,7 @@ uv run netra serve
 # http://localhost:8080
 ```
 
-Or from the repo root:
+Or with mise:
 
 ```bash
 mise run start     # Python app
@@ -73,7 +98,7 @@ mise run lint
 
 ## Capture modes
 
-| `STREAM_MODE` | Use when | How |
+| `capture.mode` | Use when | How |
 | --- | --- | --- |
 | `decrypt` | Hik-Connect encryption is on | RTSP + AES-128 decryption |
 | `rtsp` | Encryption is off | Plain RTSP |
@@ -94,31 +119,33 @@ The model is not loaded by this process. It runs wherever you like and exposes
 an OpenAI-compatible API. The app sends a single frame as a base64 `image_url`
 data URL and expects a JSON object in return.
 
-```dotenv
-VISION_BACKEND=openai
-VISION_BASE_URL=http://127.0.0.1:8000/v1
-VISION_MODEL=lfm2.5-vl-3b
-# VISION_API_KEY=
-VISION_INTERVAL=2
-VISION_COOLDOWN=20
-VISION_DISABLE_REASONING=true
-VISION_MIN_CONFIDENCE=0.75
+```yaml
+vision:
+  backend: openai
+  base_url: http://127.0.0.1:8000/v1
+  model: lfm2.5-vl-3b
+  api_key: ${VISION_API_KEY}
+  interval: 2
+  cooldown: 20
+  disable_reasoning: true
+  min_confidence: 0.75
 ```
 
 Any endpoint that supports `POST /v1/chat/completions` with image content works:
 vLLM, llama.cpp's server, LM Studio, or a gateway in front of Liquid AI's latest
 `LFM2.5-VL-3B`.
 
-Without an endpoint, keep `VISION_BACKEND=mock` (the default) to exercise the
-pipeline; it returns a deterministic `person` event.
+Without an endpoint, set `backend: mock` to exercise the pipeline; it returns a
+deterministic `person` event.
 
 How events are produced:
 
-1. Sample the active camera every `VISION_INTERVAL` seconds.
+1. Sample the active camera every `interval` seconds.
 2. Cheap motion gate (64×48 grayscale diff) — no motion, no model call.
-3. One VLM call at a time; results are parsed and validated.
-4. `none` is discarded; repeats within `VISION_COOLDOWN` update `last_seen`.
-5. Snapshot + row stored; the UI polls `/api/events`.
+3. One VLM call at a time; reasoning disabled when the template supports it.
+4. Results below `min_confidence` or `event_type: none` are discarded.
+5. Repeats within `cooldown` update `last_seen` instead of inserting.
+6. Snapshot + row stored; the UI polls `/api/events`.
 
 Events live in SQLite (`data/events.db`), snapshots in `data/events/<camera>/`.
 
@@ -146,15 +173,22 @@ Events live in SQLite (`data/events.db`), snapshots in `data/events/<camera>/`.
 uv run pytest
 uv run ruff check netra tests
 uv run ruff format --check netra tests
+uv run ty check netra tests
 ```
 
 Unit tests need no DVR and no model. The live smoke test is `netra check`.
+Rebuild the UI after changing templates or Alpine code:
+
+```bash
+npm run build:css
+```
 
 ## Layout
 
 ```
+config.yaml       cameras, DVR, capture, vision, events, recording
 netra/
-  config.py       .env + camera definitions
+  config.py       YAML loader + ${ENV} expansion
   rtsp.py         RTSP digest, RTP, NAL reassembly
   crypto.py       AES-128 NAL decryptor
   camera.py       RTSP -> decrypt -> ffmpeg -> JPEG frames
@@ -163,15 +197,19 @@ netra/
   isapi.py        verification code, channel codec
   events.py       SQLite event store + motion detector
   engine.py       motion gate -> VLM -> event
-  vision/         mock + OpenAI-compatible backends, prompt/JSON parser
-  server.py       FastAPI routes, MJPEG, auth, static UI
+  vision/         mock + OpenAI-compatible backends
+  server.py       FastAPI routes, MJPEG, auth
+  ui.py           Jinja render + initial state
+  templates/      dashboard template (Alpine + daisyUI)
+  static/         app.js, Alpine, built styles.css
   cli.py          serve / check / codecs
-  static/         stylesheet and icon
+assets/           Tailwind + daisyUI input
 ```
 
 ## Privacy
 
 Everything runs on your machine except the vision request, which goes to the
-`VISION_BASE_URL` you configure. Snapshots and events stay local. Bind to
-`127.0.0.1` by default; set `HOST=0.0.0.0` and `DASHBOARD_PASSWORD` only on a
-trusted LAN. Do not expose this to the internet without TLS and a proxy.
+`vision.base_url` you configure. Snapshots and events stay local. Bind to
+`127.0.0.1` by default; set `server.host: 0.0.0.0` and
+`server.dashboard_password` only on a trusted LAN. Do not expose this to the
+internet without TLS and a proxy.
