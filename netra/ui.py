@@ -30,12 +30,18 @@ def render_dashboard(
     resolution = f"{camera['width']} × {camera['height']}" if camera.get("width") else "—"
     record_action = "stop" if recording else "start"
 
+    refresh = ""
+    if not camera.get("live") and state in {"connecting", "offline", "error"}:
+        seconds = 2 if state == "connecting" else 10
+        refresh = f'<meta http-equiv="refresh" content="{seconds}">'
+
     return f"""<!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="theme-color" content="#0a0f16">
+{refresh}
 <title>{escape(str(camera.get("name", "Camera")))} · Netra</title>
 <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="/static/styles.css">
