@@ -135,7 +135,9 @@ Reuse the existing `.env` names; add:
 | `VISION_MODEL` | `lfm2.5-vl-3b` | Model name the endpoint expects |
 | `VISION_INTERVAL` | `2` | Seconds between samples |
 | `VISION_COOLDOWN` | `20` | Per-label event cooldown |
-| `VISION_MAX_TOKENS` | `160` | Generation cap |
+| `VISION_MAX_TOKENS` | `320` | Generation cap |
+| `VISION_DISABLE_REASONING` | `true` | Send `chat_template_kwargs.enable_thinking=false` |
+| `VISION_MIN_CONFIDENCE` | `0.75` | Drop low-confidence detections |
 | `EVENTS_DB` | `data/events.db` | SQLite path |
 | `EVENTS_DIR` | `data/events` | Snapshots |
 | `EVENT_WEBHOOK_URL` | empty | Optional POST per event |

@@ -14,8 +14,12 @@ description = "Run the unit tests"
 run = "uv run pytest"
 
 [tasks.lint]
-description = "Lint and format-check the app"
-run = "uv run ruff check netra tests && uv run ruff format --check netra tests"
+description = "Lint, format-check and type-check the app"
+run = "uv run ruff check netra tests && uv run ruff format --check netra tests && uv run ty check netra tests"
+
+[tasks.typecheck]
+description = "Type-check the app with ty"
+run = "uv run ty check netra tests"
 
 [tasks.dev]
 description = "Restart the app on file changes"

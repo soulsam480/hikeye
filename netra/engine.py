@@ -92,7 +92,10 @@ class EventEngine:
                 continue
 
             self._last_run_at = time.time()
-            if result.event_type == "none":
+            if (
+                result.event_type == "none"
+                or result.confidence < self.settings.vision_min_confidence
+            ):
                 continue
 
             event = self.store.add(camera.camera.id, result, frame, self.backend.model)
@@ -122,5 +125,6 @@ def create_backend(settings: Settings) -> VisionBackend:
             model=settings.vision_model,
             api_key=settings.vision_api_key,
             max_tokens=settings.vision_max_tokens,
+            disable_reasoning=settings.vision_disable_reasoning,
         )
     return MockVision()

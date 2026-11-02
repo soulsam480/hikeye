@@ -102,6 +102,7 @@ def test_sends_openai_chat_completion_request() -> None:
     assert body["model"] == "test-model"
     assert body["temperature"] == 0
     assert body["max_tokens"] == 160
+    assert body["chat_template_kwargs"] == {"enable_thinking": False}
     assert body["messages"][0] == {"role": "system", "content": PROMPT}
 
     user = body["messages"][1]
@@ -164,6 +165,7 @@ def test_status_reports_configuration_without_calling_endpoint() -> None:
         "model": "test-model",
         "base_url": "http://vision.local/v1",
         "available": True,
+        "reasoning": "disabled",
         "error": None,
     }
     assert "secret-key" not in json.dumps(status)

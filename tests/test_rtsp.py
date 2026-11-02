@@ -1,6 +1,5 @@
 from netra.rtsp import (
     NalAssembler,
-    RtpPacket,
     build_authorization,
     parse_challenge,
     parse_rtp,
@@ -32,6 +31,7 @@ def test_parse_challenge_and_rfc_digest_vector() -> None:
         {"nc": 0},
         cnonce="0a4f113b",
     )
+    assert header is not None
     assert 'response="6629fae49393a05397450978507c4ef1"' in header
     assert "qop=auth" in header
     assert "nc=00000001" in header
@@ -98,4 +98,4 @@ def test_assembler_handles_stap_a() -> None:
 
 def test_rtp_requires_valid_version() -> None:
     assert parse_rtp(b"\x00" + b"\x00" * 11) is None
-    assert parse_rtp(RtpPacket.__new__(RtpPacket).__class__ and b"") is None
+    assert parse_rtp(b"") is None

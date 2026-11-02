@@ -20,9 +20,12 @@ Schema:
 
 Rules:
 - Use "none" when no person, vehicle, animal or notable motion is visible.
-- Count every visible person and vehicle.
+- Report "person" only when a human is clearly visible (head/torso/limbs), not
+  a shadow, reflection, motion blur, animal or object.
+- If the frame is too dark or blurred to identify, use "none" and confidence 0.
+- Count every clearly visible person and vehicle.
 - Describe only what is visible; do not guess identities or intent.
-- confidence is 0.0-1.0.
+- confidence is 0.0-1.0; stay below 0.75 when unsure.
 """
 
 
@@ -61,14 +64,18 @@ def _extract_json(text: str) -> str:
 
 
 def _count(value: object) -> int:
+    if not isinstance(value, (int, float, str)):
+        return 0
     try:
-        return max(0, min(99, int(value)))  # type: ignore[arg-type]
+        return max(0, min(99, int(value)))
     except (TypeError, ValueError):
         return 0
 
 
 def _confidence(value: object) -> float:
+    if not isinstance(value, (int, float, str)):
+        return 0.0
     try:
-        return max(0.0, min(1.0, float(value)))  # type: ignore[arg-type]
+        return max(0.0, min(1.0, float(value)))
     except (TypeError, ValueError):
         return 0.0

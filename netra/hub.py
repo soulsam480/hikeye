@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import builtins
 import threading
+from typing import Any
 
 from .camera import CameraWorker
 from .config import CameraConfig, Settings
@@ -24,7 +26,7 @@ class CameraHub:
         self._recorders: dict[str, NalRecorder] = {}
         self._lock = threading.RLock()
 
-    def list(self) -> list[dict[str, object]]:
+    def list(self) -> builtins.list[dict[str, object]]:
         return [
             {
                 "id": camera.id,
@@ -97,7 +99,7 @@ class CameraHub:
             camera.start()
             return camera
 
-    def status_payload(self) -> dict[str, object]:
+    def status_payload(self) -> dict[str, Any]:
         camera = self.active_camera
         recorder = self.active_recorder
         return {

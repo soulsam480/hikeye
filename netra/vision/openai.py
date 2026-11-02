@@ -23,11 +23,13 @@ class OpenAIVision:
         api_key: str = "",
         timeout: float = 60.0,
         max_tokens: int = 160,
+        disable_reasoning: bool = True,
         transport: httpx.BaseTransport | None = None,
     ) -> None:
         self.base_url = base_url
         self.model = model
         self.max_tokens = max_tokens
+        self.disable_reasoning = disable_reasoning
         self._api_key = api_key
         self._endpoint = f"{base_url.rstrip('/')}/chat/completions"
         self._client = httpx.Client(timeout=timeout, transport=transport)
@@ -61,12 +63,13 @@ class OpenAIVision:
             "model": self.model,
             "base_url": self.base_url,
             "available": True,
+            "reasoning": "disabled" if self.disable_reasoning else "enabled",
             "error": self._last_error,
         }
 
     def _payload(self, jpeg: bytes) -> dict[str, object]:
         encoded = base64.b64encode(jpeg).decode("ascii")
-        return {
+        payload: dict[str, object] = {
             "model": self.model,
             "temperature": 0,
             "max_tokens": self.max_tokens,
@@ -84,6 +87,9 @@ class OpenAIVision:
                 },
             ],
         }
+        if self.disable_reasoning:
+            payload["chat_template_kwargs"] = {"enable_thinking": False}
+        return payload
 
     def _headers(self) -> dict[str, str]:
         headers = {"Content-Type": "application/json"}

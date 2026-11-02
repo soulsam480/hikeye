@@ -7,13 +7,15 @@ lock and uses a short-lived connection.
 
 from __future__ import annotations
 
+import builtins
 import io
 import sqlite3
 import threading
-from collections.abc import Iterator
+from collections.abc import Generator
 from contextlib import contextmanager
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
+from typing import Any
 
 import numpy as np
 from PIL import Image
@@ -109,7 +111,7 @@ class EventStore:
             row = conn.execute("SELECT * FROM events WHERE id = ?", (cursor.lastrowid,)).fetchone()
             return {**dict(row), "deduped": False}
 
-    def list(self, camera_id: str | None = None, limit: int = 50) -> list[dict]:
+    def list(self, camera_id: str | None = None, limit: int = 50) -> builtins.list[dict[str, Any]]:
         """Newest first, optionally for one camera. ``limit`` is clamped 1..500."""
         capped = max(1, min(MAX_LIMIT, int(limit)))
         query = "SELECT * FROM events"
@@ -155,7 +157,7 @@ class EventStore:
             conn.commit()
 
     @contextmanager
-    def _connect(self) -> Iterator[sqlite3.Connection]:
+    def _connect(self) -> Generator[sqlite3.Connection]:
         conn = sqlite3.connect(self.db_path, timeout=5.0)
         try:
             conn.row_factory = sqlite3.Row

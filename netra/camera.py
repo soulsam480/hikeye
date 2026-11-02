@@ -8,6 +8,7 @@ from collections import deque
 from collections.abc import Callable
 from contextlib import suppress
 from io import BytesIO
+from typing import Any
 
 from PIL import Image
 
@@ -140,7 +141,7 @@ class CameraWorker:
                 raise TimeoutError("Timed out waiting for a camera frame")
             return self._latest
 
-    def status(self) -> dict[str, object]:
+    def status(self) -> dict[str, Any]:
         with self._lock:
             now = time.monotonic()
             recent = [stamp for stamp in self._frame_times if now - stamp <= FPS_WINDOW_SECONDS]

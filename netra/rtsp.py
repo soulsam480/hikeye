@@ -307,7 +307,7 @@ class RtspClient:
 
         self._play_url = base
         self._request("PLAY", base, {"Range": "npt=0.000-"})
-        self._socket.settimeout(1.0)  # type: ignore[union-attr]
+        self._require_socket().settimeout(1.0)
         return info
 
     def run(
@@ -317,10 +317,11 @@ class RtspClient:
     ) -> None:
         self._on_nal = on_nal
         last_keepalive = time.monotonic()
+        sock = self._require_socket()
 
         while not stop_event.is_set() and not self._closed:
             try:
-                chunk = self._socket.recv(65536)  # type: ignore[union-attr]
+                chunk = sock.recv(65536)
             except TimeoutError:
                 if time.monotonic() - last_keepalive >= KEEPALIVE_SECONDS:
                     self._request("GET_PARAMETER", self._play_url, {})
@@ -364,7 +365,7 @@ class RtspClient:
         if authorization:
             lines.append(f"Authorization: {authorization}")
         lines.extend(f"{key}: {value}" for key, value in headers.items())
-        self._socket.sendall(("\r\n".join(lines) + "\r\n\r\n").encode())  # type: ignore[union-attr]
+        self._require_socket().sendall(("\r\n".join(lines) + "\r\n\r\n").encode())
 
     def _request(
         self, method: str, url: str, headers: dict[str, str], retried: bool = False
@@ -420,7 +421,7 @@ class RtspClient:
 
     def _fill(self) -> None:
         try:
-            chunk = self._socket.recv(65536)  # type: ignore[union-attr]
+            chunk = self._require_socket().recv(65536)
         except TimeoutError as error:
             raise RtspError("Timed out waiting for RTSP response") from error
         if not chunk:
@@ -451,8 +452,16 @@ class RtspClient:
         rtp = parse_rtp(packet)
         if rtp is None:
             return
+        callback = self._on_nal
+        if callback is None:
+            return
         for nal, timestamp, flagged in self._assembler.feed(rtp):
-            self._on_nal(nal, timestamp, flagged)  # type: ignore[misc]
+            callback(nal, timestamp, flagged)
+
+    def _require_socket(self) -> socket.socket:
+        if self._socket is None:
+            raise RtspError("RTSP socket is not connected")
+        return self._socket
 
 
 def _md5(value: str) -> str:

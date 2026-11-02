@@ -1,12 +1,13 @@
 from __future__ import annotations
 
+import builtins
 import contextlib
 import re
 import subprocess
 import threading
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import IO
+from typing import IO, Any
 
 NAME_PATTERN = re.compile(r"^rec-\d{8}-\d{6}\.mp4$")
 START_CODE = b"\x00\x00\x00\x01"
@@ -82,11 +83,11 @@ class NalRecorder:
                 self._error = error
             return self._snapshot()
 
-    def status(self) -> dict:
+    def status(self) -> dict[str, Any]:
         with self._lock:
             return self._snapshot()
 
-    def list(self) -> list[dict]:
+    def list(self) -> builtins.list[dict[str, Any]]:
         """Return saved recordings, newest first."""
         self.directory.mkdir(parents=True, exist_ok=True)
         entries: list[tuple[float, dict]] = []

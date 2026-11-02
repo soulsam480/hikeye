@@ -11,19 +11,29 @@ DEFAULT_STREAM_PATH = "/Streaming/Channels/102"
 
 
 def _as_int(value: str | None, default: int, minimum: int, maximum: int) -> int:
+    if value is None:
+        return default
     try:
-        parsed = int(value)  # type: ignore[arg-type]
+        parsed = int(value)
     except (TypeError, ValueError):
         return default
     return max(minimum, min(maximum, parsed))
 
 
 def _as_float(value: str | None, default: float, minimum: float, maximum: float) -> float:
+    if value is None:
+        return default
     try:
-        parsed = float(value)  # type: ignore[arg-type]
+        parsed = float(value)
     except (TypeError, ValueError):
         return default
     return max(minimum, min(maximum, parsed))
+
+
+def _as_bool(value: str | None, default: bool) -> bool:
+    if value is None:
+        return default
+    return value.strip().lower() not in {"0", "false", "no", "off"}
 
 
 @dataclass(frozen=True)
@@ -66,7 +76,9 @@ class Settings:
     vision_model: str = "lfm2.5-vl-3b"
     vision_interval: float = 2.0
     vision_cooldown: int = 20
-    vision_max_tokens: int = 160
+    vision_max_tokens: int = 320
+    vision_min_confidence: float = 0.75
+    vision_disable_reasoning: bool = True
     event_webhook_url: str = ""
 
     ffmpeg_path: str = "ffmpeg"
@@ -225,7 +237,9 @@ class Settings:
             vision_model=get("VISION_MODEL", "lfm2.5-vl-3b") or "lfm2.5-vl-3b",
             vision_interval=_as_float(get("VISION_INTERVAL"), 2.0, 0.5, 60.0),
             vision_cooldown=_as_int(get("VISION_COOLDOWN"), 20, 1, 3600),
-            vision_max_tokens=_as_int(get("VISION_MAX_TOKENS"), 160, 16, 1024),
+            vision_max_tokens=_as_int(get("VISION_MAX_TOKENS"), 320, 64, 4096),
+            vision_min_confidence=_as_float(get("VISION_MIN_CONFIDENCE"), 0.75, 0.0, 1.0),
+            vision_disable_reasoning=_as_bool(get("VISION_DISABLE_REASONING"), True),
             event_webhook_url=get("EVENT_WEBHOOK_URL", "") or "",
             ffmpeg_path=get("FFMPEG_PATH", "ffmpeg") or "ffmpeg",
         )

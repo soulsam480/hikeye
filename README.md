@@ -101,6 +101,8 @@ VISION_MODEL=lfm2.5-vl-3b
 # VISION_API_KEY=
 VISION_INTERVAL=2
 VISION_COOLDOWN=20
+VISION_DISABLE_REASONING=true
+VISION_MIN_CONFIDENCE=0.75
 ```
 
 Any endpoint that supports `POST /v1/chat/completions` with image content works:

@@ -4,7 +4,7 @@ import asyncio
 import base64
 import json
 import secrets
-from collections.abc import AsyncIterator
+from collections.abc import AsyncGenerator, AsyncIterator
 from contextlib import asynccontextmanager, suppress
 from pathlib import Path
 from typing import Any
@@ -32,7 +32,7 @@ def create_app(settings: Settings) -> FastAPI:
     engine = EventEngine(settings, hub, store, backend)
 
     @asynccontextmanager
-    async def lifespan(_: FastAPI) -> AsyncIterator[None]:
+    async def lifespan(_: FastAPI) -> AsyncGenerator[None]:
         if settings.stream_mode == "decrypt" and not settings.verification_code:
             settings.verification_code = (
                 await asyncio.to_thread(_read_verification_code, settings) or ""
@@ -101,8 +101,9 @@ def create_app(settings: Settings) -> FastAPI:
 
     @app.get("/api/snapshot.jpg")
     async def snapshot(camera: str | None = Query(default=None)) -> Response:
+        camera_id = _camera_id(hub, camera)
         try:
-            worker = await asyncio.to_thread(hub.activate, camera or hub.active_id)
+            worker = await asyncio.to_thread(hub.activate, camera_id)
             frame = await asyncio.to_thread(worker.snapshot, 8.0)
         except UnknownCameraError as error:
             raise HTTPException(status_code=404, detail="Unknown camera") from error
@@ -114,8 +115,9 @@ def create_app(settings: Settings) -> FastAPI:
 
     @app.get("/stream.mjpeg")
     async def stream(camera: str | None = Query(default=None)) -> StreamingResponse:
+        camera_id = _camera_id(hub, camera)
         try:
-            worker = await asyncio.to_thread(hub.activate, camera or hub.active_id)
+            worker = await asyncio.to_thread(hub.activate, camera_id)
         except UnknownCameraError as error:
             raise HTTPException(status_code=404, detail="Unknown camera") from error
 
@@ -144,7 +146,7 @@ def create_app(settings: Settings) -> FastAPI:
 
     @app.get("/api/recordings")
     async def list_recordings(camera: str | None = Query(default=None)) -> dict[str, Any]:
-        recorder = _recorder_for(hub, camera)
+        recorder = _recorder_for(hub, _camera_id(hub, camera))
         items = await asyncio.to_thread(recorder.list)
         status = _recorder_status(recorder)
         return {
@@ -164,8 +166,8 @@ def create_app(settings: Settings) -> FastAPI:
     @app.post("/api/recordings/start")
     async def start_recording(camera: str | None = Query(default=None)) -> dict[str, Any]:
         try:
-            await asyncio.to_thread(hub.activate, camera or hub.active_id)
-            recorder = _recorder_for(hub, camera)
+            await asyncio.to_thread(hub.activate, _camera_id(hub, camera))
+            recorder = _recorder_for(hub, _camera_id(hub, camera))
             status = await asyncio.to_thread(recorder.start)
         except (UnknownCameraError, RuntimeError) as error:
             raise HTTPException(status_code=409, detail=str(error)) from error
@@ -173,13 +175,13 @@ def create_app(settings: Settings) -> FastAPI:
 
     @app.post("/api/recordings/stop")
     async def stop_recording(camera: str | None = Query(default=None)) -> dict[str, Any]:
-        recorder = _recorder_for(hub, camera)
+        recorder = _recorder_for(hub, _camera_id(hub, camera))
         status = await asyncio.to_thread(recorder.stop)
         return {"ok": True, "recorder": status}
 
     @app.get("/api/recordings/{name}")
     async def serve_recording(name: str, camera: str | None = Query(default=None)) -> FileResponse:
-        recorder = _recorder_for(hub, camera)
+        recorder = _recorder_for(hub, _camera_id(hub, camera))
         path = recorder.resolve(name)
         if path is None or not path.is_file():
             raise HTTPException(status_code=404, detail="Recording not found")
@@ -189,7 +191,7 @@ def create_app(settings: Settings) -> FastAPI:
     async def delete_recording(
         name: str, camera: str | None = Query(default=None)
     ) -> dict[str, Any]:
-        recorder = _recorder_for(hub, camera)
+        recorder = _recorder_for(hub, _camera_id(hub, camera))
         try:
             await asyncio.to_thread(recorder.remove, name)
         except (ValueError, FileNotFoundError) as error:
@@ -223,7 +225,7 @@ def create_app(settings: Settings) -> FastAPI:
 
     @app.post("/ui/record/start")
     async def ui_record_start(camera: str | None = Query(default=None)) -> RedirectResponse:
-        camera_id = camera or hub.active_id
+        camera_id = _camera_id(hub, camera)
         try:
             await asyncio.to_thread(hub.activate, camera_id)
             await asyncio.to_thread(hub.recorder_for(camera_id).start)
@@ -233,7 +235,7 @@ def create_app(settings: Settings) -> FastAPI:
 
     @app.post("/ui/record/stop")
     async def ui_record_stop(camera: str | None = Query(default=None)) -> RedirectResponse:
-        camera_id = camera or hub.active_id
+        camera_id = _camera_id(hub, camera)
         with suppress(UnknownCameraError):
             await asyncio.to_thread(hub.recorder_for(camera_id).stop)
         return RedirectResponse(url=f"/?camera={camera_id}", status_code=303)
@@ -242,7 +244,7 @@ def create_app(settings: Settings) -> FastAPI:
     async def ui_delete_recording(
         name: str, camera: str | None = Query(default=None)
     ) -> RedirectResponse:
-        camera_id = camera or hub.active_id
+        camera_id = _camera_id(hub, camera)
         with suppress(UnknownCameraError, ValueError, FileNotFoundError):
             await asyncio.to_thread(hub.recorder_for(camera_id).remove, name)
         return RedirectResponse(url=f"/?camera={camera_id}", status_code=303)
@@ -268,9 +270,16 @@ def _read_verification_code(settings: Settings) -> str | None:
     return client.read_verification_code()
 
 
-def _recorder_for(hub: CameraHub, camera_id: str | None):
+def _camera_id(hub: CameraHub, camera: str | None) -> str:
+    camera_id = camera or hub.active_id
+    if not camera_id:
+        raise HTTPException(status_code=400, detail="No camera configured")
+    return camera_id
+
+
+def _recorder_for(hub: CameraHub, camera_id: str):
     try:
-        return hub.recorder_for(camera_id or hub.active_id)
+        return hub.recorder_for(camera_id)
     except UnknownCameraError as error:
         raise HTTPException(status_code=404, detail="Unknown camera") from error
 

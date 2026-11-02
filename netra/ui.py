@@ -188,7 +188,8 @@ def _events(items: list[dict[str, Any]]) -> str:
             f'<div class="event-title"><span class="tag">{kind}</span> '
             f"{item.get('people_count', 0)} people · {item.get('vehicles_count', 0)} vehicles</div>"
             f'<div class="event-meta">{_short_time(item.get("created_at"))} · '
-            f"{round(float(item.get('confidence', 0)) * 100)}%</div>"
+            f"{round(float(item.get('confidence', 0)) * 100)}% · "
+            f"{escape(str(item.get('model') or '—').split('/')[-1])}</div>"
             f'<div class="event-desc">{escape(str(item.get("description") or "No description"))}</div>'
             "</div></article>"
         )
