@@ -17,8 +17,8 @@ AES-128-ECB NAL decryption, the camera selector, recording, and the UI.
 ## Goals
 
 1. Rewrite the backend in Python with feature parity.
-2. Run a local Liquid AI vision-language model (LFM2.5-VL family) on Apple
-   Silicon via MLX.
+2. Call a vision-language model served by an **OpenAI-compatible endpoint**
+   (e.g. Liquid AI LFM2.5-VL) — the model runner stays outside this process.
 3. Turn motion-gated frames into structured events: people, vehicles, event
    type, description, confidence, snapshot.
 4. Keep it usable on a 16 GB M2: one live camera at a time, one VLM worker,
@@ -71,22 +71,25 @@ FastAPI (uvicorn)
 - **Events**: the engine samples the active camera every 2 s; a motion gate
   triggers a VLM call; results are deduped by camera + label within a 20 s
   cooldown.
-- **Vision**: one worker thread owns the model. The default backend is
-  `mock` (deterministic, no model) so the app and tests run without weights.
-  `liquid` loads MLX (preferred) or Transformers on MPS/CPU.
+- **Vision**: one worker thread calls an OpenAI-compatible endpoint. The
+  default backend is `mock` (deterministic, no endpoint) so the app and tests
+  run without a model. `openai` posts a frame to
+  `{VISION_BASE_URL}/chat/completions` and parses the reply.
 
 ## Model
 
-- Latest: `LiquidAI/LFM2.5-VL-3B` (released 2026-08-12).
-- Practical default for 16 GB: `mlx-community/LFM2.5-VL-1.6B-4bit`
-  (mlx-vlm, ~1–2 GB) with `LiquidAI/LFM2.5-VL-3B` selectable.
-- Runtime: `mlx-vlm` on Apple Silicon; `transformers` fallback.
-- Output contract: JSON only, validated with a pydantic model; invalid JSON is
-  retried once with a repair prompt, then dropped.
-- Prompt: CCTV analyst; return
+- The model runs outside this process. Netra only needs an HTTP endpoint that
+  implements `POST /v1/chat/completions` with OpenAI-style image content.
+- Works with vLLM, llama.cpp server, LM Studio, or a gateway in front of
+  Liquid AI's latest `LFM2.5-VL-3B`.
+- `VISION_BACKEND=mock` is the default so the app runs without an endpoint.
+  `VISION_BACKEND=openai` enables real inference.
+- Image is sent as `data:image/jpeg;base64,…` in an `image_url` part.
+- Output contract: JSON only
   `{event_type, people_count, vehicles_count, description, confidence}`.
+  Invalid JSON is dropped (and surfaced in `/api/status`).
 - Inference is motion-gated, not per frame. Target ≤ 1 call / 2 s, usually far
-  less.
+  less. Only one request is in flight at a time.
 
 ## Event Semantics
 
@@ -126,8 +129,10 @@ Reuse the existing `.env` names; add:
 | Variable | Default | Purpose |
 | --- | --- | --- |
 | `STREAM_STREAM` | `sub` | `sub` (xx2) or `main` (xx1) |
-| `VISION_BACKEND` | `mock` | `mock` or `liquid` |
-| `VISION_MODEL` | `mlx-community/LFM2.5-VL-1.6B-4bit` | MLX/HF model id |
+| `VISION_BACKEND` | `mock` | `mock` or `openai` |
+| `VISION_BASE_URL` | `http://127.0.0.1:8000/v1` | OpenAI-compatible endpoint |
+| `VISION_API_KEY` | empty | Bearer token, if the endpoint needs one |
+| `VISION_MODEL` | `lfm2.5-vl-3b` | Model name the endpoint expects |
 | `VISION_INTERVAL` | `2` | Seconds between samples |
 | `VISION_COOLDOWN` | `20` | Per-label event cooldown |
 | `VISION_MAX_TOKENS` | `160` | Generation cap |
@@ -144,13 +149,14 @@ Existing: `STREAM_IP`, `STREAM_USER`, `STREAM_PASS`, `CAMERAS`, `STREAM_MODE`,
 - Camera: ≤ 5% CPU, ~15 fps, ~1 Mbps (H.264 sub stream).
 - Decryption: ~1% CPU (AES-NI equivalent; Python cryptography).
 - ffmpeg decode + MJPEG encode: ~5–10% CPU.
-- VLM 1.6B 4-bit: ~2 GB RAM, ~0.5–2 s/frame; 3B 4-bit: ~3–4 GB, ~1–4 s/frame.
+- VLM latency depends on the endpoint; one request in flight, motion-gated.
 - One camera stream and one VLM call at a time.
 - Event DB and snapshots bounded by retention (`EVENT_RETENTION_DAYS`, default 30).
 
 ## Security / Privacy
 
-- No outbound network at runtime except the DVR.
+- No outbound network at runtime except the DVR and the configured
+  `VISION_BASE_URL`.
 - Verification code and camera password never logged or sent to the browser.
 - Optional Basic auth remains; default bind `127.0.0.1`.
 - Snapshots may contain people; local-only by default. Webhook is opt-in.
@@ -164,8 +170,8 @@ Existing: `STREAM_IP`, `STREAM_USER`, `STREAM_PASS`, `CAMERAS`, `STREAM_MODE`,
 4. `uv run pytest` passes without a model or DVR (unit tests).
 5. With `VISION_BACKEND=mock`, a motion event creates a visible event card and
    a snapshot file within 10 s.
-6. With `VISION_BACKEND=liquid` and a pulled model, the same flow returns model
-   labels; failure to load is reported in `/api/status`, not fatal.
+6. With `VISION_BACKEND=openai` and a stub/real endpoint, the same flow returns
+   model labels; endpoint failures are reported in `/api/status`, not fatal.
 7. No secrets in logs; `.env` remains gitignored.
 
 ## Migration
@@ -176,7 +182,7 @@ runs the Python app, and the Node tree can be archived.
 
 ## Open Questions
 
-- Final model size (1.6B vs 3B) after measuring latency on this M2.
+- Which model/endpoint to standardise on (LFM2.5-VL-3B vs 1.6B) — external.
 - Whether to analyze all cameras round-robin or only the active camera.
   Default: active camera; a config flag can enable round-robin later.
 - Main-stream resolution (704×576 vs 960×1080) — separate from this rewrite;

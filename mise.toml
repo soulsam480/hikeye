@@ -1,23 +1,42 @@
 [tools]
 node = "24"
 bun = "1.4"
+python = "3.13"
 
+# Python app (active)
 [tasks.start]
-description = "Start the dashboard with Node"
-run = "node server.js"
-
-[tasks."start:bun"]
-description = "Start the dashboard with Bun"
-run = "bun server.js"
-
-[tasks.dev]
-description = "Start with auto-restart on file changes"
-run = "node --watch server.js"
+description = "Start the Python dashboard"
+run = "cd python && uv run netra serve"
 
 [tasks.check]
-description = "Verify the camera credentials and stream"
-run = "node scripts/check-camera.js"
+description = "Check the DVR, credentials and first camera"
+run = "cd python && uv run netra check"
 
 [tasks.test]
-description = "Run the unit tests"
+description = "Run the Python unit tests"
+run = "cd python && uv run pytest"
+
+[tasks.lint]
+description = "Lint and format-check the Python app"
+run = "cd python && uv run ruff check netra tests && uv run ruff format --check netra tests"
+
+[tasks.dev]
+description = "Restart the Python app on file changes"
+run = "cd python && uv run watchfiles 'uv run netra serve' netra"
+
+# Node app (original implementation)
+[tasks."node:start"]
+description = "Start the original Node dashboard"
+run = "node server.js"
+
+[tasks."node:dev"]
+description = "Start the Node dashboard with auto-restart"
+run = "node --watch server.js"
+
+[tasks."node:check"]
+description = "Check the camera with the Node scripts"
+run = "node scripts/check-camera.js"
+
+[tasks."node:test"]
+description = "Run the Node unit tests"
 run = "node --test"

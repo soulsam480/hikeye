@@ -15,11 +15,6 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-vision = [
-  "mlx-vlm>=0.3.10; sys_platform == 'darwin'",
-  "huggingface-hub>=0.26",
-  "transformers>=4.45",
-]
 dev = [
   "pytest>=8",
   "pytest-asyncio>=0.24",
@@ -39,6 +34,7 @@ packages = ["netra"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-q"
+asyncio_default_fixture_loop_scope = "function"
 
 [tool.ruff]
 line-length = 100

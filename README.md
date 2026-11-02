@@ -1,5 +1,10 @@
 # Netra
 
+> **Python rewrite (active app):** `python/` contains the FastAPI backend with
+> Hikvision decryption and vision-language events. See
+> [python/README.md](python/README.md). The original Node implementation is
+> still available via `mise run node:start`.
+
 A local-first CCTV dashboard for Hikvision DVRs/NVRs, including **encrypted
 Hik-Connect streams**. One Node process, no build step, no cloud, no accounts.
 Credentials stay on the server and are never sent to the browser.

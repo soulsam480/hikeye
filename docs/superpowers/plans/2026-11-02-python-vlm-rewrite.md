@@ -6,7 +6,7 @@
 
 **Architecture:** FastAPI serves the existing UI and a camera hub. One active camera runs a threaded RTSP client + AES decryptor + ffmpeg pipeline. An event engine samples frames, gates on motion, calls a single local VLM worker, and stores structured events in SQLite with snapshots.
 
-**Tech Stack:** Python 3.11, uv, FastAPI, uvicorn, httpx (DigestAuth), cryptography (AES-128-ECB), Pillow, numpy, sqlite3, ffmpeg, optional mlx-vlm / transformers.
+**Tech Stack:** Python 3.13, uv, FastAPI, uvicorn, httpx (DigestAuth), cryptography (AES-128-ECB), Pillow, numpy, sqlite3, ffmpeg, OpenAI-compatible vision endpoint.
 
 **Spec:** `docs/superpowers/specs/2026-11-02-netra-python-vlm-design.md`
 
@@ -293,24 +293,25 @@
 
 ---
 
-### Task 11: Liquid model setup and live inference
+### Task 11: OpenAI-compatible vision endpoint
 
 **Files:**
-- Modify: `python/pyproject.toml` (`vision` extra)
-- Create: `python/netra/model.py` (pull/inspect)
-- Modify: `python/netra/cli.py` (`netra model pull|status`)
+- Create: `python/netra/vision/openai.py`
+- Create: `python/tests/test_vision.py`
+- Modify: `python/netra/config.py` (`VISION_BACKEND`, `VISION_BASE_URL`, `VISION_API_KEY`)
 - Modify: `python/README.md`
 
 **Interfaces:**
-- Produces: `pull_model(model_id: str) -> Path` using `huggingface_hub.snapshot_download`.
-- Produces: `model_status(model_id) -> dict` (present, path, size).
-- `LiquidVision` loads via `mlx_vlm.load` / `generate`; falls back to `transformers` `Lfm2VlForConditionalGeneration`.
+- Produces: `OpenAIVision(base_url, model, api_key="", timeout=60.0, max_tokens=160, transport=None)`.
+- Produces: `.analyze(jpeg, prompt) -> VisionResult`; `.status() -> dict`.
+- `create_backend(settings)` returns `MockVision` for `mock`, `OpenAIVision` for `openai`.
 
-- [ ] **Step 1: Add an optional-dependency test that skips when `mlx_vlm` is absent.**
-- [ ] **Step 2: Implement pull/status; verify `uv run netra model status` reports missing/present.**
-- [ ] **Step 3: Pull `mlx-community/LFM2.5-VL-1.6B-4bit` and run one image through `LiquidVision`; print latency + parsed JSON.**
-- [ ] **Step 4: Enable `VISION_BACKEND=liquid` and verify a real event with model labels.**
-- [ ] **Step 5: Commit `feat(py): local Liquid VLM backend`.**
+- [ ] **Step 1: Write failing tests with `httpx.MockTransport` for request path/body/auth and response parsing.**
+- [ ] **Step 2: Run tests — fail.**
+- [ ] **Step 3: Implement the backend; send the frame as a data URL in `image_url`; parse `choices[0].message.content`.**
+- [ ] **Step 4: Run tests — PASS.**
+- [ ] **Step 5: Integration: stub endpoint returns a vehicle event; `VISION_BACKEND=openai` stores it and `/api/status` shows it.**
+- [ ] **Step 6: Commit `feat(py): OpenAI-compatible vision backend`.**
 
 ---
 
@@ -324,7 +325,7 @@
 
 - [ ] **Step 1: Run the acceptance checklist from the spec against the DVR: 7 cameras, snapshot, recording, events, restart, auth.**
 - [ ] **Step 2: Record results in `python/docs/PARITY.md` (pass/fail + evidence).**
-- [ ] **Step 3: Document model pull, backends, event tuning, and the H.264-only rule.**
+- [ ] **Step 3: Document the vision endpoint, backends, event tuning, and the H.264-only rule.**
 - [ ] **Step 4: Run `uv run pytest` and a 10-minute soak (switch cameras, record, events).**
 - [ ] **Step 5: Commit `docs(py): parity report and cutover notes`.**
 
