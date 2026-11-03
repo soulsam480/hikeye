@@ -13,6 +13,7 @@ document.addEventListener('alpine:init', () => {
     events: window.MU_DEKHUCHI.events,
     memoryEvents: window.MU_DEKHUCHI.events,
     recordings: window.MU_DEKHUCHI.recordings,
+    stories: [],
     searchQuery: '',
 
     now: new Date(),
@@ -26,6 +27,7 @@ document.addEventListener('alpine:init', () => {
     playerSrc: '',
     playerTitle: '',
     selectedEvent: null,
+    selectedStory: null,
     hoveredEvent: null,
     audioOn: false,
     audioBytes: 0,
@@ -217,8 +219,10 @@ document.addEventListener('alpine:init', () => {
       setInterval(() => this.refresh(), 2000);
       setInterval(() => this.loadEvents(), 5000);
       setInterval(() => this.loadMemory(), 5000);
+      setInterval(() => this.loadStories(), 10000);
       setInterval(() => this.loadRecordings(), 15000);
       this.loadMemory();
+      this.loadStories();
       setInterval(() => {
         this.stillKey = Date.now();
       }, 8000);
@@ -439,6 +443,25 @@ document.addEventListener('alpine:init', () => {
       } catch {
         /* server restarting */
       }
+    },
+
+    async loadStories() {
+      try {
+        const response = await fetch('/api/stories?limit=12', { cache: 'no-store' });
+        if (response.ok) this.stories = (await response.json()).items;
+      } catch {
+        /* server restarting */
+      }
+    },
+
+    openStory(story) {
+      this.selectedStory = story;
+      this.$nextTick(() => this.$refs.storyDialog?.showModal());
+    },
+
+    closeStory() {
+      this.$refs.storyDialog?.close();
+      this.selectedStory = null;
     },
 
     async loadRecordings() {

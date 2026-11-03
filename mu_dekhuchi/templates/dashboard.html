@@ -129,6 +129,33 @@
             <span class="activity-time" x-text="signal.at ? `last ${timeAgo(signal.at)}` : 'live'"></span>
           </button>
 
+          <section class="stories" x-show="stories.length" x-cloak aria-label="Live stories">
+            <div class="stories-head">
+              <div class="flex items-baseline gap-3">
+                <h2 class="panel-title">Live stories</h2>
+                <span class="micro">cross-camera · possible links</span>
+              </div>
+              <span class="micro" x-text="`${stories.length} active`"></span>
+            </div>
+            <div class="stories-track">
+              <template x-for="story in stories" :key="story.id">
+                <button class="story" type="button" @click="openStory(story)">
+                  <div class="story-top">
+                    <span class="story-kind" x-text="story.kind"></span>
+                    <span class="story-count" x-text="`${story.cameras.length} cameras · ${story.events.length} obs`"></span>
+                  </div>
+                  <div class="story-title" x-text="`Possible ${story.kind} movement`"></div>
+                  <div class="story-path" x-text="story.path"></div>
+                  <div class="story-meta">
+                    <span x-text="`${fmtTimeShort(story.started_at)}–${fmtTimeShort(story.ended_at)}`"></span>
+                    <span x-text="`${Math.round(story.confidence * 100)}% link`"></span>
+                  </div>
+                  <p class="story-desc" x-text="story.latest.description"></p>
+                </button>
+              </template>
+            </div>
+          </section>
+
           <div class="workspace" :class="view === 'overview' ? 'is-overview' : ''">
             <section class="plate" aria-label="Live camera feed" x-show="view === 'focus'">
               <figure class="plate-media" x-ref="videoWrap">
@@ -577,6 +604,42 @@
               rel="noopener"
               >Open full frame</a
             >
+          </div>
+        </div>
+      </template>
+    </dialog>
+
+    <dialog class="modal" x-ref="storyDialog" @close="selectedStory = null">
+      <div class="modal-head">
+        <div class="flex items-baseline gap-2">
+          <span class="micro">Story</span>
+          <span class="font-mono text-[11px] text-bone" x-text="selectedStory ? selectedStory.path : '—'"></span>
+        </div>
+        <button class="modal-close" type="button" aria-label="Close" @click="closeStory()">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.7">
+            <path d="M5 5l14 14M19 5L5 19" />
+          </svg>
+        </button>
+      </div>
+      <template x-if="selectedStory">
+        <div class="story-detail">
+          <div class="story-summary">
+            <p class="story-narrative" x-text="selectedStory.narrative"></p>
+            <div class="story-summary-meta">
+              <span x-text="`${selectedStory.events.length} observations`"></span>
+              <span x-text="`${Math.round(selectedStory.confidence * 100)}% link confidence`"></span>
+            </div>
+          </div>
+          <div class="story-evidence">
+            <template x-for="event in selectedStory.events" :key="event.id">
+              <div class="story-evidence-row">
+                <img :src="`/api/events/${event.id}/snapshot`" alt="" loading="lazy" />
+                <div class="story-evidence-copy">
+                  <div class="story-evidence-meta" x-text="`${fmtTimeShort(event.created_at)} · ${cameraName(event.camera_id)}`"></div>
+                  <p x-text="event.description"></p>
+                </div>
+              </div>
+            </template>
           </div>
         </div>
       </template>

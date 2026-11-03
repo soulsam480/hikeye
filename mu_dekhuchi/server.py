@@ -21,6 +21,7 @@ from .events import EventStore
 from .hub import CameraHub, UnknownCameraError
 from .isapi import IsapiClient
 from .scanner import StillScanner
+from .stories import build_stories
 from .ui import render_dashboard
 
 STATIC_DIR = Path(__file__).parent / "static"
@@ -271,6 +272,12 @@ def create_app(settings: Settings) -> FastAPI:
         except (ValueError, FileNotFoundError) as error:
             raise HTTPException(status_code=400, detail=str(error)) from error
         return {"ok": True}
+
+    @app.get("/api/stories")
+    async def list_stories(limit: int = Query(default=12, ge=1, le=50)) -> dict[str, Any]:
+        events = store.list(None, 300)
+        names = {camera.id: camera.name for camera in settings.cameras}
+        return {"items": build_stories(events, names)[:limit]}
 
     @app.get("/api/events")
     async def list_events(

@@ -157,6 +157,16 @@ How events are produced:
 
 Events live in SQLite (`data/events.db`), snapshots in `data/events/<camera>/`.
 
+### Cross-camera stories
+
+`mu_dekhuchi/stories.py` groups `person` and `animal` events that land within
+180 seconds of each other on at least two cameras. Each story gets a camera
+path (`Camera 4 → Camera 5`), a link score, and a plain narrative. This is
+time-and-kind correlation, **not** biometric identity: treat a story as a
+possible same subject, never as a confirmed match. The dashboard polls
+`/api/stories` every 10 seconds and renders the strip above the workspace; a
+story opens into its evidence snapshots and descriptions.
+
 ## API
 
 | Method | Path | Description |
@@ -175,6 +185,7 @@ Events live in SQLite (`data/events.db`), snapshots in `data/events/<camera>/`.
 | `DELETE` | `/api/recordings/:name?camera=1` | Delete |
 | `GET` | `/api/events?camera=1&limit=24` | Vision events |
 | `GET` | `/api/events/:id/snapshot` | Event JPEG |
+| `GET` | `/api/stories?limit=12` | Cross-camera possible links |
 | `GET` | `/healthz` | Health check |
 
 ## Tests and lint
@@ -208,6 +219,7 @@ mu_dekhuchi/
   events.py       SQLite event store + motion detector
   engine.py       motion gate -> VLM -> event
   scanner.py      ISAPI still scan for inactive cameras
+  stories.py      time + kind correlation across cameras
   vision/         mock + OpenAI-compatible backends
   server.py       FastAPI routes, MJPEG, auth
   ui.py           Jinja render + initial state

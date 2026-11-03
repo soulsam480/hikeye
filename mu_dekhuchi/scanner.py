@@ -155,7 +155,7 @@ class StillScanner:
                     description = f"{check.event_type.capitalize()} movement detected"
                 people = check.people_count or (1 if check.event_type == "person" else 0)
                 result = VisionResult(
-                    event_type="motion",
+                    event_type=check.event_type,
                     people_count=people,
                     vehicles_count=check.vehicles_count,
                     description=description,
