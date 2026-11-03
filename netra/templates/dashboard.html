@@ -119,6 +119,7 @@
         <main class="page">
           <button class="activity" type="button" :data-tone="signal.tone" @click="scrollToJournal()">
             <span class="activity-main">
+              <span class="activity-kicker">Signal</span>
               <span class="activity-dot" :class="signal.tone === 'active' ? 'dot-pulse' : ''"></span>
               <span class="activity-state" x-text="signal.state"></span>
               <span class="activity-sep">/</span>
@@ -435,8 +436,8 @@
                   <input
                     type="search"
                     x-model="searchQuery"
-                    placeholder="Search all events…"
-                    aria-label="Search all events"
+                    placeholder="Search memory…"
+                    aria-label="Search memory across all cameras"
                   />
                 </label>
                 <button class="mini" type="button" x-show="searchQuery" x-cloak @click="searchQuery = ''">
