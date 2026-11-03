@@ -6,6 +6,7 @@ from typing import Any
 
 from .camera import CameraWorker
 from .config import CameraConfig, Settings
+from .isapi import read_verification_code
 from .recorder import NalRecorder
 
 
@@ -37,6 +38,19 @@ class CameraHub:
             for camera in self._definitions.values()
         ]
 
+    def _fresh_verification_code(self) -> str:
+        if self.settings.stream_mode != "decrypt":
+            return ""
+        if not self.settings.verification_code:
+            code = read_verification_code(
+                f"http://{self.settings.stream_ip}",
+                self.settings.stream_user,
+                self.settings.stream_pass,
+            )
+            if code:
+                self.settings.verification_code = code
+        return self.settings.verification_code
+
     def camera_for(self, camera_id: str) -> CameraWorker:
         key = str(camera_id)
         if key not in self._definitions:
@@ -47,6 +61,7 @@ class CameraHub:
                 worker = CameraWorker(
                     self._definitions[key],
                     self.settings.verification_code,
+                    code_provider=self._fresh_verification_code,
                     ffmpeg_path=self.settings.ffmpeg_path,
                     fps=self.settings.stream_fps,
                     quality=self.settings.stream_quality,

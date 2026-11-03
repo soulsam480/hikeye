@@ -58,12 +58,14 @@ class CameraWorker:
         camera: CameraConfig,
         verification_code: str,
         *,
+        code_provider: Callable[[], str] | None = None,
         ffmpeg_path: str = "ffmpeg",
         fps: int = 10,
         quality: int = 5,
     ) -> None:
         self.camera = camera
         self.verification_code = verification_code
+        self.code_provider = code_provider
         self.ffmpeg_path = ffmpeg_path
         self.fps = fps
         self.quality = quality
@@ -193,7 +195,20 @@ class CameraWorker:
             if self._stop.wait(backoff):
                 break
 
+    def _refresh_code(self) -> None:
+        if self.verification_code or self.code_provider is None:
+            return
+        try:
+            code = self.code_provider()
+        except Exception:
+            return
+        if code:
+            self.verification_code = code
+            with self._lock:
+                self._decryptor = HikDecryptor(code)
+
     def _run_session(self) -> None:
+        self._refresh_code()
         with self._lock:
             self._state = "connecting"
             self._error = ""

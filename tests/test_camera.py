@@ -55,3 +55,24 @@ def test_snapshot_times_out_without_frames() -> None:
         pass
     else:
         raise AssertionError("expected TimeoutError")
+
+
+def test_worker_fetches_missing_code_from_provider() -> None:
+    worker = CameraWorker(_camera(), "", code_provider=lambda: "ABC123")
+
+    worker._refresh_code()
+
+    assert worker.verification_code == "ABC123"
+    assert worker.status()["decryption"]["enabled"] is True
+
+
+def test_worker_survives_failing_code_provider() -> None:
+    def offline() -> str:
+        raise OSError("host is down")
+
+    worker = CameraWorker(_camera(), "", code_provider=offline)
+
+    worker._refresh_code()
+
+    assert worker.verification_code == ""
+    assert worker.status()["decryption"]["enabled"] is False
