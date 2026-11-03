@@ -3,7 +3,7 @@ from collections.abc import Callable
 import httpx
 import pytest
 
-from netra.isapi import IsapiClient
+from mu_dekhuchi.isapi import IsapiClient
 
 EZVIZ_XML = """<?xml version="1.0" encoding="UTF-8"?>
 <EZVIZ version="2.0" xmlns="http://www.hikvision.com/ver20/XMLSchema">

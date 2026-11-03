@@ -1,4 +1,4 @@
-# Netra
+# mu-dekhuchi
 
 Local-first CCTV dashboard for Hikvision DVRs/NVRs, with **encrypted RTSP
 decryption** and **vision-language events** from an OpenAI-compatible endpoint.
@@ -53,7 +53,7 @@ Everything else lives in `config.yaml`:
 
 ```yaml
 dvr:
-  host: 192.168.0.100
+  host: 192.168.0.103
   user: admin
   password: ${STREAM_PASS}
 
@@ -74,18 +74,18 @@ vision:
 ```
 
 `${VAR}` values are expanded from `.env` or the process environment. Point at a
-different file with `NETRA_CONFIG=/path/to/config.yaml`.
+different file with `MU_DEKHUCHI_CONFIG=/path/to/config.yaml`.
 
 Then verify the DVR, credentials, verification code and first camera:
 
 ```bash
-uv run netra check
+uv run mu-dekhuchi check
 ```
 
 Run the dashboard:
 
 ```bash
-uv run netra serve
+uv run mu-dekhuchi serve
 # http://localhost:8080
 ```
 
@@ -113,7 +113,7 @@ verification code, zero-padded to 16 bytes. The decryption port is based on
 (MIT).
 
 **H.264 only.** Hikvision H.265 uses a different layout. Set each sub stream to
-H.264 (DVR UI or `uv run netra codecs --set-h264`).
+H.264 (DVR UI or `uv run mu-dekhuchi codecs --set-h264`).
 
 ## Vision
 
@@ -175,12 +175,12 @@ Events live in SQLite (`data/events.db`), snapshots in `data/events/<camera>/`.
 
 ```bash
 uv run pytest
-uv run ruff check netra tests
-uv run ruff format --check netra tests
-uv run ty check netra tests
+uv run ruff check mu_dekhuchi tests
+uv run ruff format --check mu_dekhuchi tests
+uv run ty check mu_dekhuchi tests
 ```
 
-Unit tests need no DVR and no model. The live smoke test is `netra check`.
+Unit tests need no DVR and no model. The live smoke test is `mu-dekhuchi check`.
 Rebuild the UI after changing templates or Alpine code:
 
 ```bash
@@ -191,7 +191,7 @@ npm run build:css
 
 ```
 config.yaml       cameras, DVR, capture, vision, events, recording
-netra/
+mu_dekhuchi/
   config.py       YAML loader + ${ENV} expansion
   rtsp.py         RTSP digest, RTP, NAL reassembly
   crypto.py       AES-128 NAL decryptor

@@ -9,7 +9,7 @@ from pathlib import Path
 
 import pytest
 
-from netra.recorder import NalRecorder
+from mu_dekhuchi.recorder import NalRecorder
 
 NAME_RE = r"^rec-\d{8}-\d{6}\.mp4$"
 
@@ -71,7 +71,7 @@ class _FakePopen:
 @pytest.fixture
 def fake_popen(monkeypatch: pytest.MonkeyPatch) -> _FakePopen:
     fake = _FakePopen(_FakeProc())
-    monkeypatch.setattr("netra.recorder.subprocess.Popen", fake)
+    monkeypatch.setattr("mu_dekhuchi.recorder.subprocess.Popen", fake)
     return fake
 
 
@@ -184,7 +184,7 @@ def test_stop_without_recording_returns_idle_status(tmp_path: Path) -> None:
 
 def test_stop_kills_ffmpeg_after_timeout(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     proc = _StuckProc()
-    monkeypatch.setattr("netra.recorder.subprocess.Popen", lambda *args, **kwargs: proc)
+    monkeypatch.setattr("mu_dekhuchi.recorder.subprocess.Popen", lambda *args, **kwargs: proc)
     recorder = NalRecorder(tmp_path)
     recorder.start()
 
@@ -199,7 +199,7 @@ def test_stop_reports_last_stderr_line_on_failure(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     proc = _FakeProc(returncode=1, stderr=b"first problem\nInvalid data found\n")
-    monkeypatch.setattr("netra.recorder.subprocess.Popen", lambda *args, **kwargs: proc)
+    monkeypatch.setattr("mu_dekhuchi.recorder.subprocess.Popen", lambda *args, **kwargs: proc)
     recorder = NalRecorder(tmp_path)
     recorder.start()
 

@@ -12,7 +12,7 @@ from .server import create_app
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
-        prog="netra", description="Local CCTV dashboard with on-device vision"
+        prog="mu-dekhuchi", description="Local CCTV dashboard with on-device vision"
     )
     subparsers = parser.add_subparsers(dest="command", required=True)
 

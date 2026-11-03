@@ -4,17 +4,17 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="theme-color" content="#0b0b0c" />
-    <title>Netra · Live console</title>
+    <title>mu-dekhuchi · Live console</title>
     <link rel="icon" href="/static/favicon.svg" type="image/svg+xml" />
     <link rel="stylesheet" href="/static/styles.css?v={{ asset_version }}" />
     <script>
-      window.NETRA = {{ initial | tojson }};
+      window.MU_DEKHUCHI = {{ initial | tojson }};
     </script>
     <script defer src="/static/app.js?v={{ asset_version }}"></script>
     <script defer src="/static/vendor/alpine.min.js"></script>
   </head>
 
-  <body x-data="netra()" x-init="init()" @keydown.window="hotkey($event)">
+  <body x-data="muDekhuchi()" x-init="init()" @keydown.window="hotkey($event)">
     <div class="shell">
       <aside class="rail" aria-label="Camera rail">
         <div class="brand">
@@ -24,7 +24,7 @@
             <circle cx="12" cy="12" r="0.9" fill="currentColor" stroke="none" />
           </svg>
           <div>
-            <div class="brand-name">NETRA</div>
+            <div class="brand-name">MU-DEKHUCHI</div>
             <div class="brand-sub">Local observation</div>
           </div>
         </div>
@@ -59,7 +59,7 @@
             <span class="text-bone">None</span>
           </div>
           <div class="rail-foot-row">
-            <span>Netra</span>
+            <span>mu-dekhuchi</span>
             <span>2.0</span>
           </div>
         </div>
@@ -526,7 +526,7 @@
           </section>
 
           <footer class="foot">
-            <span>Netra 2.0 · local-first · no cloud accounts</span>
+            <span>mu-dekhuchi 2.0 · local-first · no cloud accounts</span>
             <span class="foot-keys">
               <span><kbd>1–7</kbd> cameras</span>
               <span><kbd>R</kbd> record</span>

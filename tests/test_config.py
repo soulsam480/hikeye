@@ -2,7 +2,7 @@ from pathlib import Path
 
 import yaml
 
-from netra.config import Settings, parse_env_text
+from mu_dekhuchi.config import Settings, parse_env_text
 
 
 def _mapping(**overrides: object) -> dict:
@@ -32,7 +32,7 @@ def test_cameras_and_urls_from_yaml() -> None:
                 "password": "p@ss&x",
             }
         ),
-        root=Path("/tmp/netra-config-test"),
+        root=Path("/tmp/mu_dekhuchi-config-test"),
     )
 
     assert [camera.id for camera in settings.cameras] == ["1", "2"]
@@ -48,7 +48,7 @@ def test_cameras_and_urls_from_yaml() -> None:
 def test_main_stream_uses_channel_01() -> None:
     settings = Settings.from_mapping(
         _mapping(capture={"mode": "decrypt", "stream": "main"}),
-        root=Path("/tmp/netra-config-test"),
+        root=Path("/tmp/mu_dekhuchi-config-test"),
     )
 
     assert [camera.stream_id for camera in settings.cameras] == ["101", "201"]
@@ -61,7 +61,7 @@ def test_invalid_values_fall_back() -> None:
             capture={"mode": "banana", "stream": "nope"},
             vision={"backend": "banana"},
         ),
-        root=Path("/tmp/netra-config-test"),
+        root=Path("/tmp/mu_dekhuchi-config-test"),
     )
 
     assert settings.stream_mode == "rtsp"

@@ -1,4 +1,4 @@
-from netra.rtsp import (
+from mu_dekhuchi.rtsp import (
     NalAssembler,
     build_authorization,
     parse_challenge,

@@ -23,7 +23,7 @@ from .isapi import IsapiClient
 from .ui import render_dashboard
 
 STATIC_DIR = Path(__file__).parent / "static"
-BOUNDARY = "netra-frame"
+BOUNDARY = "mu-dekhuchi-frame"
 
 
 def create_app(settings: Settings) -> FastAPI:
@@ -43,13 +43,13 @@ def create_app(settings: Settings) -> FastAPI:
             try:
                 await asyncio.to_thread(hub.activate, settings.active_camera_id)
             except Exception as error:
-                print(f"[netra] camera start failed: {error}")
+                print(f"[mu-dekhuchi] camera start failed: {error}")
         engine.start()
         yield
         engine.stop()
         await asyncio.to_thread(hub.shutdown)
 
-    app = FastAPI(title="Netra", lifespan=lifespan)
+    app = FastAPI(title="mu-dekhuchi", lifespan=lifespan)
 
     @app.middleware("http")
     async def basic_auth(request: Request, call_next: Any) -> Response:
@@ -57,7 +57,7 @@ def create_app(settings: Settings) -> FastAPI:
             return Response(
                 "Authentication required",
                 status_code=401,
-                headers={"WWW-Authenticate": 'Basic realm="Netra"'},
+                headers={"WWW-Authenticate": 'Basic realm="mu-dekhuchi"'},
             )
         return await call_next(request)
 

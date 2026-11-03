@@ -2,8 +2,8 @@ from pathlib import Path
 
 from fastapi.testclient import TestClient
 
-from netra.config import Settings
-from netra.server import _audio_command, create_app
+from mu_dekhuchi.config import Settings
+from mu_dekhuchi.server import _audio_command, create_app
 
 
 def _settings(tmp_path: Path, *, dashboard_password: str = "") -> Settings:
@@ -70,7 +70,7 @@ def test_audio_command_extracts_pcm(tmp_path: Path) -> None:
 
 def test_still_route_returns_jpeg(tmp_path: Path, monkeypatch) -> None:
     monkeypatch.setattr(
-        "netra.server._read_still",
+        "mu_dekhuchi.server._read_still",
         lambda settings, camera: b"\xff\xd8still",
     )
     app = create_app(_settings(tmp_path))

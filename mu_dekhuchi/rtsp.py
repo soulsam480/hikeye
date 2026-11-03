@@ -254,7 +254,7 @@ class RtspClient:
         username: str = "",
         password: str = "",
         timeout: float = DEFAULT_TIMEOUT,
-        user_agent: str = "Netra/2.0",
+        user_agent: str = "mu-dekhuchi/2.0",
     ) -> None:
         parts = urlsplit(url)
         if not parts.hostname:

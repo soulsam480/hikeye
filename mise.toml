@@ -15,11 +15,11 @@ run = "npm run watch:css"
 
 [tasks.start]
 description = "Start the dashboard"
-run = "uv run netra serve"
+run = "uv run mu-dekhuchi serve"
 
 [tasks.check]
 description = "Check the DVR, credentials and first camera"
-run = "uv run netra check"
+run = "uv run mu-dekhuchi check"
 
 [tasks.test]
 description = "Run the unit tests"
@@ -27,12 +27,12 @@ run = "uv run pytest"
 
 [tasks.lint]
 description = "Lint, format-check and type-check the app"
-run = "uv run ruff check netra tests && uv run ruff format --check netra tests && uv run ty check netra tests"
+run = "uv run ruff check mu_dekhuchi tests && uv run ruff format --check mu_dekhuchi tests && uv run ty check mu_dekhuchi tests"
 
 [tasks.typecheck]
 description = "Type-check the app with ty"
-run = "uv run ty check netra tests"
+run = "uv run ty check mu_dekhuchi tests"
 
 [tasks.dev]
 description = "Restart the app on file changes"
-run = "uv run watchfiles 'uv run netra serve' netra"
+run = "uv run watchfiles 'uv run mu-dekhuchi serve' mu_dekhuchi"

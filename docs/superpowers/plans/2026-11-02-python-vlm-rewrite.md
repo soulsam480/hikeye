@@ -1,14 +1,14 @@
-# Netra Python + Local VLM Rewrite Implementation Plan
+# mu-dekhuchi Python + Local VLM Rewrite Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Rebuild Netra in Python with feature parity and add local, motion-gated Liquid AI vision events.
+**Goal:** Rebuild mu-dekhuchi in Python with feature parity and add local, motion-gated Liquid AI vision events.
 
 **Architecture:** FastAPI serves the existing UI and a camera hub. One active camera runs a threaded RTSP client + AES decryptor + ffmpeg pipeline. An event engine samples frames, gates on motion, calls a single local VLM worker, and stores structured events in SQLite with snapshots.
 
 **Tech Stack:** Python 3.13, uv, FastAPI, uvicorn, httpx (DigestAuth), cryptography (AES-128-ECB), Pillow, numpy, sqlite3, ffmpeg, OpenAI-compatible vision endpoint.
 
-**Spec:** `docs/superpowers/specs/2026-11-02-netra-python-vlm-design.md`
+**Spec:** `docs/superpowers/specs/2026-11-02-mu-dekhuchi-python-vlm-design.md`
 
 ## Global Constraints
 
@@ -37,8 +37,8 @@
 
 **Files:**
 - Create: `python/pyproject.toml`
-- Create: `python/netra/__init__.py`
-- Create: `python/netra/config.py`
+- Create: `python/mu_dekhuchi/__init__.py`
+- Create: `python/mu_dekhuchi/config.py`
 - Create: `python/tests/test_config.py`
 - Create: `python/.env.example`
 
@@ -66,7 +66,7 @@
 ### Task 2: Hikvision AES decryptor
 
 **Files:**
-- Create: `python/netra/crypto.py`
+- Create: `python/mu_dekhuchi/crypto.py`
 - Create: `python/tests/test_crypto.py`
 
 **Interfaces:**
@@ -93,7 +93,7 @@
 ### Task 3: RTSP client (Digest, RTP, NAL reassembly)
 
 **Files:**
-- Create: `python/netra/rtsp.py`
+- Create: `python/mu_dekhuchi/rtsp.py`
 - Create: `python/tests/test_rtsp.py`
 
 **Interfaces:**
@@ -121,7 +121,7 @@
 ### Task 4: ISAPI helpers
 
 **Files:**
-- Create: `python/netra/isapi.py`
+- Create: `python/mu_dekhuchi/isapi.py`
 - Create: `python/tests/test_isapi.py`
 
 **Interfaces:**
@@ -149,7 +149,7 @@
 ### Task 5: Camera worker (RTSP → decrypt → ffmpeg → JPEG)
 
 **Files:**
-- Create: `python/netra/camera.py`
+- Create: `python/mu_dekhuchi/camera.py`
 - Create: `python/tests/test_camera.py` (unit parts only)
 - Create: `python/scripts/live_smoke.py` (manual)
 
@@ -176,7 +176,7 @@
 ### Task 6: NAL recorder
 
 **Files:**
-- Create: `python/netra/recorder.py`
+- Create: `python/mu_dekhuchi/recorder.py`
 - Create: `python/tests/test_recorder.py`
 
 **Interfaces:**
@@ -194,12 +194,12 @@
 ### Task 7: Camera hub, FastAPI API, auth, static parity
 
 **Files:**
-- Create: `python/netra/hub.py`
-- Create: `python/netra/server.py`
-- Create: `python/netra/auth.py`
-- Create: `python/netra/static/` (copy `public/`, rename only if needed)
+- Create: `python/mu_dekhuchi/hub.py`
+- Create: `python/mu_dekhuchi/server.py`
+- Create: `python/mu_dekhuchi/auth.py`
+- Create: `python/mu_dekhuchi/static/` (copy `public/`, rename only if needed)
 - Create: `python/tests/test_api.py`
-- Create: `python/netra/cli.py`
+- Create: `python/mu_dekhuchi/cli.py`
 
 **Interfaces:**
 - Produces: `CameraHub(settings)`: `.list()`, `.active_id`, `.activate(id)`, `.camera`, `.recorder`, `.status_payload()`, `.shutdown()`.
@@ -214,7 +214,7 @@
 - [ ] **Step 2: Run tests — fail.**
 - [ ] **Step 3: Implement hub (lazy workers/recorders, stop on switch), MJPEG StreamingResponse (latest frame, drop repeats), snapshot, recordings, SSE-less polling, static files, Basic auth dependency.**
 - [ ] **Step 4: Run tests — PASS.**
-- [ ] **Step 5: Run `uv run netra serve` and open `:8080`; verify camera 1 live + switch.**
+- [ ] **Step 5: Run `uv run mu-dekhuchi serve` and open `:8080`; verify camera 1 live + switch.**
 - [ ] **Step 6: Commit `feat(py): hub, API, auth, UI parity`.**
 
 ---
@@ -222,7 +222,7 @@
 ### Task 8: Motion detector and event store
 
 **Files:**
-- Create: `python/netra/events.py`
+- Create: `python/mu_dekhuchi/events.py`
 - Create: `python/tests/test_events.py`
 
 **Interfaces:**
@@ -247,12 +247,12 @@
 ### Task 9: Vision backends and event engine
 
 **Files:**
-- Create: `python/netra/vision/__init__.py`
-- Create: `python/netra/vision/base.py`
-- Create: `python/netra/vision/mock.py`
-- Create: `python/netra/vision/liquid.py`
-- Create: `python/netra/vision/prompts.py`
-- Create: `python/netra/engine.py`
+- Create: `python/mu_dekhuchi/vision/__init__.py`
+- Create: `python/mu_dekhuchi/vision/base.py`
+- Create: `python/mu_dekhuchi/vision/mock.py`
+- Create: `python/mu_dekhuchi/vision/liquid.py`
+- Create: `python/mu_dekhuchi/vision/prompts.py`
+- Create: `python/mu_dekhuchi/engine.py`
 - Create: `python/tests/test_vision.py`
 
 **Interfaces:**
@@ -275,9 +275,9 @@
 ### Task 10: Events UI
 
 **Files:**
-- Modify: `python/netra/static/index.html`
-- Modify: `python/netra/static/styles.css`
-- Modify: `python/netra/static/app.js`
+- Modify: `python/mu_dekhuchi/static/index.html`
+- Modify: `python/mu_dekhuchi/static/styles.css`
+- Modify: `python/mu_dekhuchi/static/app.js`
 - Create: `python/tests/test_ui_contract.py`
 
 **Interfaces:**
@@ -296,9 +296,9 @@
 ### Task 11: OpenAI-compatible vision endpoint
 
 **Files:**
-- Create: `python/netra/vision/openai.py`
+- Create: `python/mu_dekhuchi/vision/openai.py`
 - Create: `python/tests/test_vision.py`
-- Modify: `python/netra/config.py` (`VISION_BACKEND`, `VISION_BASE_URL`, `VISION_API_KEY`)
+- Modify: `python/mu_dekhuchi/config.py` (`VISION_BACKEND`, `VISION_BASE_URL`, `VISION_API_KEY`)
 - Modify: `python/README.md`
 
 **Interfaces:**

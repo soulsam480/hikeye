@@ -8,10 +8,10 @@ from typing import Any
 import httpx
 import pytest
 
-from netra.vision.base import VisionParseError, VisionResult, VisionUnavailable
-from netra.vision.mock import MockVision
-from netra.vision.openai import OpenAIVision
-from netra.vision.prompts import PROMPT, parse_result
+from mu_dekhuchi.vision.base import VisionParseError, VisionResult, VisionUnavailable
+from mu_dekhuchi.vision.mock import MockVision
+from mu_dekhuchi.vision.openai import OpenAIVision
+from mu_dekhuchi.vision.prompts import PROMPT, parse_result
 
 VALID_RESULT = (
     '{"event_type":"person","people_count":1,"vehicles_count":0,'

@@ -17,7 +17,7 @@ leaving the browser.
 
 ## Product Purpose
 
-Netra is a local-first CCTV console for Hikvision DVRs/NVRs. It turns an
+mu-dekhuchi is a local-first CCTV console for Hikvision DVRs/NVRs. It turns an
 encrypted RTSP feed into a live browser view, records clips without
 re-encoding, and uses a local vision-language model to turn motion into
 described, searchable events. Success means the owner trusts the feed at a
@@ -56,7 +56,7 @@ subscription. No account, no vendor app, no hosted inference.
 
 ## Brand Commitments
 
-The name is Netra (Sanskrit for eye). The existing mark is an eye/lens glyph.
+The name is mu-dekhuchi (Odia for "I am seeing"). The existing mark is an eye/lens glyph.
 The product is private, local, and technical; it should never look like a
 consumer subscription upsell or a generic SaaS admin template.
 

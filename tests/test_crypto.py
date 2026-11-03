@@ -2,7 +2,7 @@ import os
 
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 
-from netra.crypto import HikDecryptor
+from mu_dekhuchi.crypto import HikDecryptor
 
 CODE = "abc123"
 

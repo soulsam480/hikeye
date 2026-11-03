@@ -5,8 +5,8 @@ from pathlib import Path
 
 from PIL import Image, ImageDraw
 
-from netra.events import EventStore, MotionDetector
-from netra.vision.base import VisionResult
+from mu_dekhuchi.events import EventStore, MotionDetector
+from mu_dekhuchi.vision.base import VisionResult
 
 FRAME_SIZE = (128, 96)
 

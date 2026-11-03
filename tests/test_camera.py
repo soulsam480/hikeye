@@ -1,5 +1,5 @@
-from netra.camera import CameraWorker, split_jpegs
-from netra.config import CameraConfig
+from mu_dekhuchi.camera import CameraWorker, split_jpegs
+from mu_dekhuchi.config import CameraConfig
 
 JPEG = b"\xff\xd8\xff" + b"payload" + b"\xff\xd9"
 

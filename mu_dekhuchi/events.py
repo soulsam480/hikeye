@@ -20,7 +20,7 @@ from typing import Any
 import numpy as np
 from PIL import Image
 
-from netra.vision.base import VisionResult
+from mu_dekhuchi.vision.base import VisionResult
 
 MAX_LIMIT = 500
 

@@ -78,7 +78,9 @@ class Settings:
         merged = {**file_env, **(os.environ if env is None else env)}
 
         configured = config_file or (
-            Path(merged["NETRA_CONFIG"]) if merged.get("NETRA_CONFIG") else root / CONFIG_FILE
+            Path(merged["MU_DEKHUCHI_CONFIG"])
+            if merged.get("MU_DEKHUCHI_CONFIG")
+            else root / CONFIG_FILE
         )
         path = configured if configured.is_absolute() else root / configured
         if not path.exists():

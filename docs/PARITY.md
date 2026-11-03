@@ -8,7 +8,7 @@
 | Area | Evidence |
 | --- | --- |
 | Config | `config.yaml` is the single source; `.env` has 3 secrets only |
-| DVR login + verification code | `uv run netra check` → code read from DVR |
+| DVR login + verification code | `uv run mu-dekhuchi check` → code read from DVR |
 | Live decryption | Camera 1: live, 352×288, ~15 fps, `decryptedNals == flaggedNals` |
 | All 7 cameras | Cameras 2–7 switch and decrypt with no error |
 | Snapshot | `/api/snapshot.jpg` → HTTP 200, valid JPEG |

@@ -3,16 +3,16 @@ let audioSocket = null;
 let audioTime = 0;
 
 document.addEventListener('alpine:init', () => {
-  Alpine.data('netra', () => ({
-    status: window.NETRA.status,
-    camera: window.NETRA.status.camera,
-    recorder: window.NETRA.status.recorder,
-    cameras: window.NETRA.status.cameras,
-    activeId: window.NETRA.status.activeId,
-    vision: window.NETRA.status.vision,
-    events: window.NETRA.events,
-    memoryEvents: window.NETRA.events,
-    recordings: window.NETRA.recordings,
+  Alpine.data('muDekhuchi', () => ({
+    status: window.MU_DEKHUCHI.status,
+    camera: window.MU_DEKHUCHI.status.camera,
+    recorder: window.MU_DEKHUCHI.status.recorder,
+    cameras: window.MU_DEKHUCHI.status.cameras,
+    activeId: window.MU_DEKHUCHI.status.activeId,
+    vision: window.MU_DEKHUCHI.status.vision,
+    events: window.MU_DEKHUCHI.events,
+    memoryEvents: window.MU_DEKHUCHI.events,
+    recordings: window.MU_DEKHUCHI.recordings,
     searchQuery: '',
 
     now: new Date(),

@@ -1,4 +1,4 @@
-# Netra Python + Local VLM — Design Spec
+# mu-dekhuchi Python + Local VLM — Design Spec
 
 **Date:** 2026-11-02
 **Status:** Approved direction; implementation follows
@@ -78,7 +78,7 @@ FastAPI (uvicorn)
 
 ## Model
 
-- The model runs outside this process. Netra only needs an HTTP endpoint that
+- The model runs outside this process. mu-dekhuchi only needs an HTTP endpoint that
   implements `POST /v1/chat/completions` with OpenAI-style image content.
 - Works with vLLM, llama.cpp server, LM Studio, or a gateway in front of
   Liquid AI's latest `LFM2.5-VL-3B`.
@@ -169,7 +169,7 @@ Existing: `STREAM_IP`, `STREAM_USER`, `STREAM_PASS`, `CAMERAS`, `STREAM_MODE`,
 
 ## Acceptance Criteria
 
-1. `uv run netra serve` serves the dashboard on `:8080`.
+1. `uv run mu-dekhuchi serve` serves the dashboard on `:8080`.
 2. All 7 cameras switch and decrypt at ~15 fps; health shows
    `decrypted / flagged`.
 3. Snapshot returns a valid JPEG; recording produces a playable MP4.
