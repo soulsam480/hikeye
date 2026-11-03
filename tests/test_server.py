@@ -6,7 +6,12 @@ from mu_dekhuchi.config import Settings
 from mu_dekhuchi.server import _audio_command, create_app
 
 
-def _settings(tmp_path: Path, *, dashboard_password: str = "") -> Settings:
+def _settings(
+    tmp_path: Path,
+    *,
+    dashboard_password: str = "",
+    capture_mode: str = "rtsp",
+) -> Settings:
     return Settings.from_mapping(
         {
             "server": {
@@ -16,7 +21,7 @@ def _settings(tmp_path: Path, *, dashboard_password: str = "") -> Settings:
                 "dashboard_password": dashboard_password,
             },
             "dvr": {"host": "127.0.0.1", "port": 1, "user": "admin", "password": "secret"},
-            "capture": {"mode": "rtsp", "stream": "sub"},
+            "capture": {"mode": capture_mode, "stream": "sub"},
             "cameras": [{"id": "1", "name": "Test", "channel": 1}],
             "vision": {"backend": "mock"},
             "events": {
@@ -92,3 +97,14 @@ def test_basic_auth_protects_every_route(tmp_path: Path) -> None:
         assert client.get("/").status_code == 401
         assert client.get("/healthz", auth=("admin", "pw")).status_code == 200
         assert client.get("/healthz", auth=("admin", "wrong")).status_code == 401
+
+
+def test_startup_survives_dvr_offline(tmp_path: Path, monkeypatch) -> None:
+    def offline(_: Settings) -> str:
+        raise OSError("host is down")
+
+    monkeypatch.setattr("mu_dekhuchi.server._read_verification_code", offline)
+    app = create_app(_settings(tmp_path, capture_mode="decrypt"))
+
+    with TestClient(app) as client:
+        assert client.get("/healthz").status_code == 200

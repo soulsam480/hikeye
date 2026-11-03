@@ -39,9 +39,12 @@ def create_app(settings: Settings) -> FastAPI:
     @asynccontextmanager
     async def lifespan(_: FastAPI) -> AsyncGenerator[None]:
         if settings.stream_mode == "decrypt" and not settings.verification_code:
-            settings.verification_code = (
-                await asyncio.to_thread(_read_verification_code, settings) or ""
-            )
+            try:
+                settings.verification_code = (
+                    await asyncio.to_thread(_read_verification_code, settings) or ""
+                )
+            except Exception as error:
+                print(f"[mu-dekhuchi] verification code unavailable: {error}")
         if settings.active_camera_id:
             try:
                 await asyncio.to_thread(hub.activate, settings.active_camera_id)
