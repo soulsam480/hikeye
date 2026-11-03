@@ -37,6 +37,8 @@ vision:
   min_confidence: 0.75
   max_tokens: 320
   disable_reasoning: true
+  scan_all_cameras: true
+  scan_interval: 2
   webhook_url: ""
 
 events:

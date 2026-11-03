@@ -38,6 +38,7 @@ class EventEngine:
         self._last_error = ""
         self._last_run_at: float | None = None
         self._lock = threading.Lock()
+        self.analysis_lock = threading.Lock()
 
     def start(self) -> None:
         if self._thread and self._thread.is_alive():
@@ -83,7 +84,8 @@ class EventEngine:
                 continue
 
             try:
-                result = self.backend.analyze(frame, PROMPT)
+                with self.analysis_lock:
+                    result = self.backend.analyze(frame, PROMPT)
             except VisionUnavailable as error:
                 self._record_error(str(error))
                 continue

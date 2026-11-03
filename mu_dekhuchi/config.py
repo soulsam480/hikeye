@@ -57,6 +57,8 @@ class Settings:
     vision_max_tokens: int = 320
     vision_min_confidence: float = 0.75
     vision_disable_reasoning: bool = True
+    vision_scan_all_cameras: bool = False
+    vision_scan_interval: float = 2.0
     event_webhook_url: str = ""
 
     ffmpeg_path: str = "ffmpeg"
@@ -158,6 +160,8 @@ class Settings:
             vision_max_tokens=_as_int(vision.get("max_tokens"), 320, 64, 4096),
             vision_min_confidence=_as_float(vision.get("min_confidence"), 0.75, 0.0, 1.0),
             vision_disable_reasoning=_as_bool(vision.get("disable_reasoning"), True),
+            vision_scan_all_cameras=_as_bool(vision.get("scan_all_cameras"), False),
+            vision_scan_interval=_as_float(vision.get("scan_interval"), 2.0, 0.5, 30.0),
             event_webhook_url=str(vision.get("webhook_url") or ""),
             ffmpeg_path=str(data.get("ffmpeg") or "ffmpeg"),
         )

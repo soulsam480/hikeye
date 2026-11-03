@@ -14,6 +14,10 @@ No cloud, no hosted inference, no accounts.
   vehicles, animals, descriptions, confidence, snapshots, an activity signal
   that collapses repeated observations into one incident across all cameras,
   and search across recent events
+- **All-camera motion scan** — every 2 seconds, ISAPI stills from inactive
+  cameras are diffed and passed through a VLM gate; laundry, trees, shadows and
+  lighting are ignored, while real person or animal movement is logged as
+  a motion incident with a description (vehicles stay on the active camera)
 - **SQLite event store** with cooldowns/dedupe and retention
 - FastAPI + uvicorn, typed Python 3.13, `uv`, `ruff`, pytest
 
@@ -71,6 +75,8 @@ vision:
   model: LiquidAI/LFM3-VL-2B-MLX-4bit
   disable_reasoning: true
   min_confidence: 0.75
+  scan_all_cameras: true
+  scan_interval: 2
 ```
 
 `${VAR}` values are expanded from `.env` or the process environment. Point at a
@@ -201,6 +207,7 @@ mu_dekhuchi/
   isapi.py        verification code, channel codec
   events.py       SQLite event store + motion detector
   engine.py       motion gate -> VLM -> event
+  scanner.py      ISAPI still scan for inactive cameras
   vision/         mock + OpenAI-compatible backends
   server.py       FastAPI routes, MJPEG, auth
   ui.py           Jinja render + initial state

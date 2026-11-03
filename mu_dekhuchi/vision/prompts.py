@@ -7,6 +7,27 @@ from .base import VisionParseError, VisionResult
 
 EVENT_TYPES = {"person", "vehicle", "animal", "motion", "none"}
 
+MOTION_PROMPT = """You are a CCTV motion filter. Look at the image and return JSON only.
+
+Schema:
+{
+  "event_type": "person|animal|vehicle|none",
+  "people_count": 0,
+  "vehicles_count": 0,
+  "description": "short factual sentence",
+  "confidence": 0.0
+}
+
+Rules:
+- Use "none" for empty scenes, laundry, clothes, trees, bushes, shadows, rain,
+  lighting changes, camera noise, and parked objects with no living subject.
+- Use "person", "animal", or "vehicle" only when a real one is clearly visible.
+- If something is visible, describe the movement in one short factual sentence.
+- Count clearly visible people and vehicles.
+- Do not guess an identity or intent.
+- confidence is 0.0-1.0; stay below 0.75 when unsure.
+"""
+
 PROMPT = """You are a CCTV analyst. Look at the image and return JSON only.
 
 Schema:

@@ -41,6 +41,7 @@ def test_health_status_and_ui_contract(tmp_path: Path) -> None:
         assert status["activeId"] == "1"
         assert status["vision"]["name"] == "mock"
         assert set(status["recorder"]) >= {"recording", "durationSeconds", "bytes"}
+        assert status["scanner"]["running"] is False
 
         cameras = client.get("/api/cameras").json()
         assert cameras["cameras"][0]["id"] == "1"

@@ -20,6 +20,7 @@ from .engine import EventEngine, create_backend
 from .events import EventStore
 from .hub import CameraHub, UnknownCameraError
 from .isapi import IsapiClient
+from .scanner import StillScanner
 from .ui import render_dashboard
 
 STATIC_DIR = Path(__file__).parent / "static"
@@ -31,6 +32,7 @@ def create_app(settings: Settings) -> FastAPI:
     store = EventStore(settings.events_db, settings.events_dir, settings.vision_cooldown)
     backend = create_backend(settings)
     engine = EventEngine(settings, hub, store, backend)
+    scanner = StillScanner(settings, hub, store, backend, analysis_lock=engine.analysis_lock)
     still_cache: dict[str, tuple[float, bytes]] = {}
 
     @asynccontextmanager
@@ -45,7 +47,10 @@ def create_app(settings: Settings) -> FastAPI:
             except Exception as error:
                 print(f"[mu-dekhuchi] camera start failed: {error}")
         engine.start()
+        if settings.vision_scan_all_cameras:
+            scanner.start()
         yield
+        scanner.stop()
         engine.stop()
         await asyncio.to_thread(hub.shutdown)
 
@@ -73,13 +78,13 @@ def create_app(settings: Settings) -> FastAPI:
 
     @app.get("/api/status")
     async def status() -> dict[str, Any]:
-        return _status_payload(hub, engine)
+        return _status_payload(hub, engine, scanner)
 
     @app.get("/api/status/stream")
     async def status_stream() -> StreamingResponse:
         async def events() -> AsyncIterator[bytes]:
             while True:
-                payload = json.dumps(_status_payload(hub, engine), default=str)
+                payload = json.dumps(_status_payload(hub, engine, scanner), default=str)
                 yield f"event: status\ndata: {payload}\n\n".encode()
                 await asyncio.sleep(2.0)
 
@@ -324,9 +329,15 @@ def create_app(settings: Settings) -> FastAPI:
     return app
 
 
-def _status_payload(hub: CameraHub, engine: EventEngine) -> dict[str, Any]:
+def _status_payload(
+    hub: CameraHub,
+    engine: EventEngine,
+    scanner: StillScanner | None = None,
+) -> dict[str, Any]:
     payload = hub.status_payload()
     payload["vision"] = engine.status()
+    if scanner is not None:
+        payload["scanner"] = scanner.status()
     return payload
 
 
