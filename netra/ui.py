@@ -8,10 +8,23 @@ from .engine import EventEngine
 from .events import EventStore
 from .hub import CameraHub
 
+STATIC_DIR = Path(__file__).parent / "static"
+
 _TEMPLATES = Environment(
     loader=FileSystemLoader(Path(__file__).parent / "templates"),
     autoescape=select_autoescape(["html"]),
 )
+
+
+def _asset_version() -> str:
+    """Cache-bust the built CSS/JS whenever either file changes."""
+    latest = 0
+    for name in ("styles.css", "app.js"):
+        try:
+            latest = max(latest, (STATIC_DIR / name).stat().st_mtime_ns)
+        except OSError:
+            continue
+    return str(latest)
 
 
 def render_dashboard(hub: CameraHub, store: EventStore, engine: EventEngine) -> str:
@@ -24,4 +37,7 @@ def render_dashboard(hub: CameraHub, store: EventStore, engine: EventEngine) -> 
         "events": store.list(active_id or None, 18),
         "recordings": recordings,
     }
-    return _TEMPLATES.get_template("dashboard.html").render(initial=initial)
+    return _TEMPLATES.get_template("dashboard.html").render(
+        initial=initial,
+        asset_version=_asset_version(),
+    )

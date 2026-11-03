@@ -6,11 +6,11 @@
     <meta name="theme-color" content="#0b0b0c" />
     <title>Netra · Live console</title>
     <link rel="icon" href="/static/favicon.svg" type="image/svg+xml" />
-    <link rel="stylesheet" href="/static/styles.css" />
+    <link rel="stylesheet" href="/static/styles.css?v={{ asset_version }}" />
     <script>
       window.NETRA = {{ initial | tojson }};
     </script>
-    <script defer src="/static/app.js"></script>
+    <script defer src="/static/app.js?v={{ asset_version }}"></script>
     <script defer src="/static/vendor/alpine.min.js"></script>
   </head>
 
@@ -423,7 +423,7 @@
                 <h2 x-text="searchQuery.trim() ? 'Memory' : 'Activity journal'"></h2>
                 <span
                   class="section-count"
-                  x-text="searchQuery.trim() ? `${journal.length} matches` : `${journal.length} incidents · ${events.length} observations`"
+                  x-text="searchQuery.trim() ? `${journal.length} matches` : `${journal.length} incidents · ${memoryEvents.length} observations`"
                 ></span>
               </div>
               <div class="journal-tools">

@@ -1457,6 +1457,10 @@
     margin-top: 24px;
   }
 
+  #journal {
+    scroll-margin-top: 72px;
+  }
+
   .section-head {
     display: flex;
     flex-wrap: wrap;
@@ -1498,9 +1502,21 @@
 
   .sheet {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+    grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 12px;
     margin-top: 12px;
+  }
+
+  @media (max-width: 1100px) {
+    .sheet {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+
+  @media (max-width: 640px) {
+    .sheet {
+      grid-template-columns: minmax(0, 1fr);
+    }
   }
 
   .frame {
@@ -1534,16 +1550,15 @@
 
   .frame-img {
     position: relative;
-    aspect-ratio: 16 / 10;
     overflow: hidden;
     background: #000;
     border-bottom: 1px solid var(--line);
   }
 
   .frame-img img {
+    display: block;
     width: 100%;
-    height: 100%;
-    object-fit: cover;
+    height: auto;
     transition: transform 400ms ease;
   }
 
@@ -1596,8 +1611,8 @@
     background: rgb(11 11 12 / 0.86);
     padding: 2px 5px;
     font-family: "JetBrains Mono", ui-monospace, monospace;
-    font-size: 8px;
-    letter-spacing: 0.08em;
+    font-size: 9px;
+    letter-spacing: 0.06em;
     color: var(--bone);
   }
 
@@ -1615,8 +1630,8 @@
     justify-content: space-between;
     gap: 8px;
     font-family: "JetBrains Mono", ui-monospace, monospace;
-    font-size: 8px;
-    letter-spacing: 0.08em;
+    font-size: 9px;
+    letter-spacing: 0.06em;
     text-transform: uppercase;
     color: var(--mute);
   }
@@ -1639,8 +1654,8 @@
     margin-top: auto;
     padding-top: 4px;
     font-family: "JetBrains Mono", ui-monospace, monospace;
-    font-size: 8px;
-    letter-spacing: 0.06em;
+    font-size: 9px;
+    letter-spacing: 0.04em;
     text-transform: uppercase;
     color: var(--mute);
   }

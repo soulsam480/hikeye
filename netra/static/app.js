@@ -102,7 +102,7 @@ document.addEventListener('alpine:init', () => {
 
     get recentEvents() {
       const cutoff = this.now.getTime() - 15 * 60 * 1000;
-      return this.events
+      return this.memoryEvents
         .filter((event) => new Date(event.created_at).getTime() >= cutoff)
         .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
     },
@@ -136,7 +136,7 @@ document.addEventListener('alpine:init', () => {
 
     get incidents() {
       const windowMs = 10 * 60 * 1000;
-      const ordered = [...this.events].sort(
+      const ordered = [...this.memoryEvents].sort(
         (a, b) => new Date(a.created_at) - new Date(b.created_at),
       );
       const groups = [];
@@ -216,7 +216,7 @@ document.addEventListener('alpine:init', () => {
       }, 1000);
       setInterval(() => this.refresh(), 2000);
       setInterval(() => this.loadEvents(), 5000);
-      setInterval(() => this.loadMemory(), 15000);
+      setInterval(() => this.loadMemory(), 5000);
       setInterval(() => this.loadRecordings(), 15000);
       this.loadMemory();
       setInterval(() => {

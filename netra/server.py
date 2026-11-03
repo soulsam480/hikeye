@@ -290,7 +290,7 @@ def create_app(settings: Settings) -> FastAPI:
             except UnknownCameraError as error:
                 raise HTTPException(status_code=404, detail="Unknown camera") from error
         page = await asyncio.to_thread(render_dashboard, hub, store, engine)
-        return HTMLResponse(page)
+        return HTMLResponse(page, headers={"Cache-Control": "no-store, max-age=0"})
 
     @app.post("/ui/record/start")
     async def ui_record_start(camera: str | None = Query(default=None)) -> RedirectResponse:

@@ -5,7 +5,7 @@ server:
   dashboard_password: ${DASHBOARD_PASSWORD}
 
 dvr:
-  host: 192.168.0.100
+  host: 192.168.0.103
   port: 554
   user: admin
   password: ${STREAM_PASS}

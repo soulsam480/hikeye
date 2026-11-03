@@ -51,6 +51,9 @@ def test_health_status_and_ui_contract(tmp_path: Path) -> None:
         assert "Activity journal" in index.text
         assert "All cameras" in index.text
         assert "Test" in index.text
+        assert "app.js?v=" in index.text
+        assert "styles.css?v=" in index.text
+        assert index.headers["cache-control"].startswith("no-store")
         assert client.get("/static/styles.css").status_code == 200
 
 
