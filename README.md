@@ -159,13 +159,16 @@ Events live in SQLite (`data/events.db`), snapshots in `data/events/<camera>/`.
 
 ### Cross-camera stories
 
-`mu_dekhuchi/stories.py` groups `person` and `animal` events that land within
-180 seconds of each other on at least two cameras. Each story gets a camera
-path (`Camera 4 → Camera 5`), a link score, and a plain narrative. This is
-time-and-kind correlation, **not** biometric identity: treat a story as a
-possible same subject, never as a confirmed match. The dashboard polls
-`/api/stories` every 10 seconds and renders the strip above the workspace; a
-story opens into its evidence snapshots and descriptions.
+`mu_dekhuchi/stories.py` groups `person` and `animal` events on at least two
+cameras when they fit inside a 90-second span with no gap larger than 45
+seconds. Each story gets a camera path (`Camera 4 → Camera 5`), a link score,
+and a plain narrative. When a story spans more than 60 seconds or collects
+more than 8 observations it is marked **loose**: the UI says "loose link" and
+"possible activity" instead of presenting a percentage. This is time-and-kind
+correlation, **not** biometric identity: treat a story as a possible same
+subject, never as a confirmed match. The dashboard polls `/api/stories` every
+10 seconds and renders the strip above the workspace; a story opens into its
+evidence snapshots and descriptions.
 
 ## API
 

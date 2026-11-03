@@ -19,7 +19,7 @@
 | UI | Jinja + Alpine + Tailwind console, 7 cameras, all-camera wall, live audio, activity signal, all-camera grouped journal, memory search, cache-busted assets, 0 console errors |
 | Audio | Sub-stream PCM μ-law 8 kHz → WebSocket 16 kHz s16le → AudioContext running |
 | All-camera motion | ISAPI stills every 2 s, VLM-gated to person/animal; clothes/trees/lighting return none |
-| Cross-camera stories | `/api/stories` links person/animal events on ≥2 cameras within 180 s; strip + evidence modal render with 0 console errors |
+| Cross-camera stories | `/api/stories` links person/animal events on ≥2 cameras within a 90 s span and 45 s gap; long chains downgrade to "loose link"; strip + evidence modal render with 0 console errors |
 | Tests | `uv run pytest` — 96 passed |
 | Lint | `ruff` clean; `ty` 0 diagnostics |
 

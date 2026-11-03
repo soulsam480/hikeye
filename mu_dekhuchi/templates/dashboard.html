@@ -144,11 +144,11 @@
                     <span class="story-kind" x-text="story.kind"></span>
                     <span class="story-count" x-text="`${story.cameras.length} cameras · ${story.events.length} obs`"></span>
                   </div>
-                  <div class="story-title" x-text="`Possible ${story.kind} movement`"></div>
+                  <div class="story-title" x-text="story.title"></div>
                   <div class="story-path" x-text="story.path"></div>
                   <div class="story-meta">
                     <span x-text="`${fmtTimeShort(story.started_at)}–${fmtTimeShort(story.ended_at)}`"></span>
-                    <span x-text="`${Math.round(story.confidence * 100)}% link`"></span>
+                    <span x-text="story.link_label"></span>
                   </div>
                   <p class="story-desc" x-text="story.latest.description"></p>
                 </button>
@@ -627,7 +627,8 @@
             <p class="story-narrative" x-text="selectedStory.narrative"></p>
             <div class="story-summary-meta">
               <span x-text="`${selectedStory.events.length} observations`"></span>
-              <span x-text="`${Math.round(selectedStory.confidence * 100)}% link confidence`"></span>
+              <span x-text="`${selectedStory.duration_seconds}s span`"></span>
+              <span x-text="selectedStory.link_label"></span>
             </div>
           </div>
           <div class="story-evidence">

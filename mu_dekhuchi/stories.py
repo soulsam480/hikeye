@@ -3,8 +3,11 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any
 
-STORY_WINDOW_SECONDS = 180
+STORY_WINDOW_SECONDS = 90
+STORY_MAX_GAP_SECONDS = 45
 STORY_KINDS = {"person", "animal"}
+LOOSE_SPAN_SECONDS = 60
+LOOSE_EVENT_COUNT = 8
 
 
 def _when(value: str) -> datetime:
@@ -16,12 +19,15 @@ def build_stories(
     camera_names: dict[str, str],
     *,
     window_seconds: int = STORY_WINDOW_SECONDS,
+    max_gap_seconds: int = STORY_MAX_GAP_SECONDS,
     min_cameras: int = 2,
 ) -> list[dict[str, Any]]:
     """Correlate nearby person/animal observations into cross-camera stories.
 
-    This is deliberately conservative in wording: a story is a *possible*
-    link based on kind + time, not a biometric identity match.
+    A story is a *possible* link based on kind + time, not a biometric
+    identity match. It is bounded twice: no single gap larger than
+    ``max_gap_seconds`` and no span larger than ``window_seconds``, so a
+    chain cannot drift across unrelated sightings.
     """
     stories: list[dict[str, Any]] = []
 
@@ -34,7 +40,9 @@ def build_stories(
         candidates = [
             story
             for story in stories
-            if story["kind"] == kind and (at - story["_last"]).total_seconds() <= window_seconds
+            if story["kind"] == kind
+            and (at - story["_last"]).total_seconds() <= max_gap_seconds
+            and (at - story["_start"]).total_seconds() <= window_seconds
         ]
         if candidates:
             story = min(candidates, key=lambda item: at - item["_last"])
@@ -65,6 +73,7 @@ def build_stories(
                 ],
                 "started_at": event["created_at"],
                 "ended_at": event["created_at"],
+                "_start": at,
                 "_last": at,
                 "_camera_ids": [event["camera_id"]],
             }
@@ -76,7 +85,26 @@ def build_stories(
             continue
         path = " → ".join(camera["name"] for camera in story["cameras"])
         count = len(story["events"])
-        confidence = min(0.9, 0.35 + 0.12 * len(story["cameras"]) + 0.03 * min(count, 6))
+        span = (_when(story["ended_at"]) - _when(story["started_at"])).total_seconds()
+        duration = int(span)
+        loose = span > LOOSE_SPAN_SECONDS or count > LOOSE_EVENT_COUNT
+
+        camera_factor = min(len(story["cameras"]) - 1, 3) / 3
+        time_factor = max(0.0, 1 - span / window_seconds)
+        confidence = min(0.8, 0.35 + 0.25 * camera_factor + 0.2 * time_factor)
+
+        if loose:
+            title = f"Possible {story['kind']} activity"
+            narrative = (
+                f"Possible {story['kind']} activity across {path} "
+                f"over {duration}s; the link is loose."
+            )
+            link_label = "loose link"
+        else:
+            title = f"Possible {story['kind']} movement"
+            narrative = f"Possible {story['kind']} movement across {path}."
+            link_label = f"{round(confidence * 100)}% link"
+
         result.append(
             {
                 "id": f"story-{story['events'][0]['id']}-{story['events'][-1]['id']}",
@@ -88,7 +116,11 @@ def build_stories(
                 "ended_at": story["ended_at"],
                 "path": path,
                 "confidence": round(confidence, 2),
-                "narrative": f"Possible {story['kind']} movement across {path}.",
+                "link_label": link_label,
+                "loose": loose,
+                "title": title,
+                "duration_seconds": duration,
+                "narrative": narrative,
             }
         )
 
