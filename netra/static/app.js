@@ -11,7 +11,9 @@ document.addEventListener('alpine:init', () => {
     activeId: window.NETRA.status.activeId,
     vision: window.NETRA.status.vision,
     events: window.NETRA.events,
+    memoryEvents: window.NETRA.events,
     recordings: window.NETRA.recordings,
+    searchQuery: '',
 
     now: new Date(),
     busy: false,
@@ -98,6 +100,115 @@ document.addEventListener('alpine:init', () => {
       });
     },
 
+    get recentEvents() {
+      const cutoff = this.now.getTime() - 15 * 60 * 1000;
+      return this.events
+        .filter((event) => new Date(event.created_at).getTime() >= cutoff)
+        .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+    },
+
+    get signal() {
+      const recent = this.recentEvents;
+      if (!recent.length) {
+        return {
+          state: 'Quiet',
+          tone: 'quiet',
+          detail: 'No activity in the last 15 minutes',
+          camera: '',
+          type: '',
+          at: null,
+          count: 0,
+        };
+      }
+      const latest = recent[0];
+      const types = [...new Set(recent.map((event) => event.event_type))];
+      const count = recent.length;
+      return {
+        state: count >= 2 ? 'Movement' : 'Activity',
+        tone: count >= 2 ? 'active' : 'notice',
+        detail: `${count} observation${count === 1 ? '' : 's'} in 15m`,
+        camera: this.cameraName(latest.camera_id),
+        type: types.join(' / '),
+        at: latest.created_at,
+        count,
+      };
+    },
+
+    get incidents() {
+      const windowMs = 10 * 60 * 1000;
+      const ordered = [...this.events].sort(
+        (a, b) => new Date(a.created_at) - new Date(b.created_at),
+      );
+      const groups = [];
+      const latestByKind = new Map();
+      for (const event of ordered) {
+        const at = new Date(event.created_at).getTime();
+        const kind = `${event.camera_id}:${event.event_type}`;
+        const last = latestByKind.get(kind);
+        if (last && at - last.lastAt <= windowMs) {
+          last.events.push(event);
+          last.lastAt = at;
+          last.lastSeen = event.created_at;
+          last.latest = event;
+        } else {
+          const group = {
+            key: `${kind}-${event.id}`,
+            camera_id: event.camera_id,
+            event_type: event.event_type,
+            events: [event],
+            firstAt: at,
+            lastAt: at,
+            firstSeen: event.created_at,
+            lastSeen: event.created_at,
+            latest: event,
+          };
+          groups.push(group);
+          latestByKind.set(kind, group);
+        }
+      }
+      return groups.sort((a, b) => b.lastAt - a.lastAt);
+    },
+
+    get journal() {
+      if (this.searchQuery.trim()) {
+        return this.filteredMemory.map((event) => ({
+          latest: event,
+          count: 1,
+          firstSeen: event.created_at,
+          lastSeen: event.created_at,
+          camera_id: event.camera_id,
+          event_type: event.event_type,
+        }));
+      }
+      return this.incidents.map((incident) => ({
+        latest: incident.latest,
+        count: incident.events.length,
+        firstSeen: incident.firstSeen,
+        lastSeen: incident.lastSeen,
+        camera_id: incident.camera_id,
+        event_type: incident.event_type,
+      }));
+    },
+
+    get filteredMemory() {
+      const query = this.searchQuery.trim().toLowerCase();
+      if (!query) return [];
+      return this.memoryEvents
+        .filter((event) => {
+          const haystack = [
+            event.description,
+            event.event_type,
+            this.cameraName(event.camera_id),
+            this.fmtTimeShort(event.created_at),
+            event.model,
+          ]
+            .join(' ')
+            .toLowerCase();
+          return haystack.includes(query);
+        })
+        .slice(0, 60);
+    },
+
     init() {
       this.$nextTick(() => this.revealActiveCamera());
       setInterval(() => {
@@ -105,7 +216,9 @@ document.addEventListener('alpine:init', () => {
       }, 1000);
       setInterval(() => this.refresh(), 2000);
       setInterval(() => this.loadEvents(), 5000);
+      setInterval(() => this.loadMemory(), 15000);
       setInterval(() => this.loadRecordings(), 15000);
+      this.loadMemory();
       setInterval(() => {
         this.stillKey = Date.now();
       }, 8000);
@@ -272,6 +385,7 @@ document.addEventListener('alpine:init', () => {
         await this.refresh();
         if (this.audioOn) await this.restartAudio();
         await this.loadEvents();
+        await this.loadMemory();
         await this.loadRecordings();
       } finally {
         this.busy = false;
@@ -313,6 +427,15 @@ document.addEventListener('alpine:init', () => {
           cache: 'no-store',
         });
         if (response.ok) this.events = (await response.json()).items;
+      } catch {
+        /* server restarting */
+      }
+    },
+
+    async loadMemory() {
+      try {
+        const response = await fetch('/api/events?limit=200', { cache: 'no-store' });
+        if (response.ok) this.memoryEvents = (await response.json()).items;
       } catch {
         /* server restarting */
       }
@@ -398,6 +521,31 @@ document.addEventListener('alpine:init', () => {
     channelOf(id) {
       const camera = this.cameras.find((item) => String(item.id) === String(id));
       return camera ? String(camera.channel).padStart(2, '0') : '—';
+    },
+
+    cameraName(id) {
+      const camera = this.cameras.find((item) => String(item.id) === String(id));
+      return camera ? camera.name : `Camera ${id}`;
+    },
+
+    countLabel(count, singular) {
+      return `${count} ${count === 1 ? singular : `${singular}s`}`;
+    },
+
+    rangeLabel(entry) {
+      if (entry.count <= 1) return this.fmtTimeShort(entry.latest.created_at);
+      return `${this.fmtTimeShort(entry.firstSeen)}–${this.fmtTimeShort(entry.lastSeen)}`;
+    },
+
+    timeAgo(value) {
+      const diff = Math.max(0, (this.now.getTime() - new Date(value).getTime()) / 1000);
+      if (diff < 60) return `${Math.floor(diff)}s ago`;
+      if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
+      return `${Math.floor(diff / 3600)}h ago`;
+    },
+
+    scrollToJournal() {
+      document.getElementById('journal')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     },
 
     pad(value, length = 2) {

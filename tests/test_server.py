@@ -48,7 +48,7 @@ def test_health_status_and_ui_contract(tmp_path: Path) -> None:
 
         index = client.get("/")
         assert index.status_code == 200
-        assert "Vision events" in index.text
+        assert "Activity journal" in index.text
         assert "All cameras" in index.text
         assert "Test" in index.text
         assert client.get("/static/styles.css").status_code == 200

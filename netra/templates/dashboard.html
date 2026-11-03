@@ -117,6 +117,17 @@
         </nav>
 
         <main class="page">
+          <button class="activity" type="button" :data-tone="signal.tone" @click="scrollToJournal()">
+            <span class="activity-main">
+              <span class="activity-dot" :class="signal.tone === 'active' ? 'dot-pulse' : ''"></span>
+              <span class="activity-state" x-text="signal.state"></span>
+              <span class="activity-sep">/</span>
+              <span class="activity-detail" x-text="signal.camera ? `${signal.camera} · ${signal.type}` : 'All cameras'"></span>
+              <span class="activity-detail" x-text="signal.detail"></span>
+            </span>
+            <span class="activity-time" x-text="signal.at ? `last ${timeAgo(signal.at)}` : 'live'"></span>
+          </button>
+
           <div class="workspace" :class="view === 'overview' ? 'is-overview' : ''">
             <section class="plate" aria-label="Live camera feed" x-show="view === 'focus'">
               <figure class="plate-media" x-ref="videoWrap">
@@ -406,49 +417,70 @@
             </section>
           </div>
 
-          <section class="section" aria-label="Vision events">
+          <section class="section" id="journal" aria-label="Activity journal">
             <div class="section-head">
               <div class="section-title">
-                <h2>Contact sheet</h2>
-                <span class="section-count" x-text="`${events.length} frames`"></span>
+                <h2 x-text="searchQuery.trim() ? 'Memory' : 'Activity journal'"></h2>
+                <span
+                  class="section-count"
+                  x-text="searchQuery.trim() ? `${journal.length} matches` : `${journal.length} incidents · ${events.length} observations`"
+                ></span>
               </div>
-              <span class="section-note">motion-gated · confidence ≥ 0.75</span>
+              <div class="journal-tools">
+                <label class="search">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true">
+                    <circle cx="11" cy="11" r="6.5" />
+                    <path d="m16 16 4 4" />
+                  </svg>
+                  <input
+                    type="search"
+                    x-model="searchQuery"
+                    placeholder="Search all events…"
+                    aria-label="Search all events"
+                  />
+                </label>
+                <button class="mini" type="button" x-show="searchQuery" x-cloak @click="searchQuery = ''">
+                  Clear
+                </button>
+              </div>
             </div>
 
-            <div class="sheet" x-show="events.length" x-cloak>
-              <template x-for="(event, index) in events" :key="event.id">
+            <div class="sheet" x-show="journal.length" x-cloak>
+              <template x-for="(entry, index) in journal" :key="`${entry.camera_id}-${entry.event_type}-${entry.latest.id}`">
                 <button
                   class="frame"
                   type="button"
                   :style="`animation-delay:${Math.min(index, 8) * 35}ms`"
-                  @click="openEvent(event)"
+                  @click="openEvent(entry.latest)"
                 >
                   <div class="frame-img">
-                    <img :src="`/api/events/${event.id}/snapshot`" alt="" loading="lazy" />
-                    <span class="frame-no" x-text="`F-${pad(event.id, 3)}`"></span>
-                    <span class="frame-type" :data-tone="eventTone(event)" x-text="event.event_type"></span>
+                    <img :src="`/api/events/${entry.latest.id}/snapshot`" alt="" loading="lazy" />
+                    <span class="frame-no" x-text="`F-${pad(entry.latest.id, 3)}`"></span>
+                    <span class="frame-type" :data-tone="eventTone(entry.latest)" x-text="entry.latest.event_type"></span>
+                    <span class="frame-count" x-show="entry.count > 1" x-cloak x-text="`×${entry.count}`"></span>
                   </div>
                   <div class="frame-body">
                     <div class="frame-meta">
-                      <span x-text="fmtTimeShort(event.created_at)"></span>
-                      <span x-text="`${Math.round(event.confidence * 100)}% match`"></span>
+                      <span x-text="rangeLabel(entry)"></span>
+                      <span x-text="`${Math.round(entry.latest.confidence * 100)}% match`"></span>
                     </div>
-                    <p class="frame-desc" x-text="event.description"></p>
+                    <p class="frame-desc" x-text="entry.latest.description"></p>
                     <div class="frame-foot">
-                      <span x-text="`${event.people_count} people · ${event.vehicles_count} vehicles`"></span>
-                      <span x-text="`CH ${channelOf(event.camera_id)}`"></span>
+                      <span x-text="`${countLabel(entry.latest.people_count, 'person')} · ${countLabel(entry.latest.vehicles_count, 'vehicle')}`"></span>
+                      <span x-text="`${cameraName(entry.camera_id)} · CH ${channelOf(entry.camera_id)}`"></span>
                     </div>
                   </div>
                 </button>
               </template>
             </div>
 
-            <div class="empty-sheet" x-show="!events.length" x-cloak>
+            <div class="empty-sheet" x-show="!journal.length" x-cloak>
               <span class="empty-glyph">+</span>
-              <span class="empty-title">No exposures yet</span>
-              <p class="empty-copy">
-                Motion above the detector threshold will log a frame here with the model's description, counts and confidence.
-              </p>
+              <span class="empty-title" x-text="searchQuery.trim() ? 'No matches' : 'No exposures yet'"></span>
+              <p
+                class="empty-copy"
+                x-text="searchQuery.trim() ? 'Try a camera name, event type, or a word from the description.' : 'Motion above the detector threshold will log a frame here with the model description, counts and confidence.'"
+              ></p>
             </div>
           </section>
 

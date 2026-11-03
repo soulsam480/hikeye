@@ -71,8 +71,14 @@ one column, and archive rows stack.
 - **All-camera wall:** four-up desktop grid of 704×576 ISAPI stills, each with
   channel, active/still state, and name; clicking a tile activates that camera
   and returns to focus. Stills refresh every 8 seconds.
-- **Contact sheet:** photographic frames with `F-###` numbers, type tag,
-  timestamp, confidence, two-line description, counts, and channel.
+- **Activity signal:** a full-width status bar above the workspace. Quiet is
+  sage; one observation is amber “Activity”; two or more in 15 minutes is amber
+  “Movement”. Clicking scrolls to the journal.
+- **Contact sheet / journal:** photographic frames with `F-###` numbers, type
+  tag, timestamp or first–last range, confidence, two-line description, counts,
+  and channel. Observations within 10 minutes on the same camera and type
+  collapse into one incident with a `×N` badge. Search replaces the journal
+  with matching events from every camera.
 - **Archive:** file, size, modified, play/download/delete. Delete is isolated
   with extra space and only turns red on hover.
 - **Dialogs:** event detail with frame + metadata; video playback for clips.

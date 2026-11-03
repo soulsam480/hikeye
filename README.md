@@ -11,7 +11,9 @@ No cloud, no hosted inference, no accounts.
 - **Reads the verification code from the DVR** with an admin account
 - **Live MJPEG + camera audio**, snapshots, per-camera MP4 recording, browser playback
 - **Vision events** — motion-gated frames sent to a local VLM endpoint; people,
-  vehicles, animals, descriptions, confidence, snapshots
+  vehicles, animals, descriptions, confidence, snapshots, an activity signal
+  that collapses repeated observations into one incident, and search across
+  recent events
 - **SQLite event store** with cooldowns/dedupe and retention
 - FastAPI + uvicorn, typed Python 3.13, `uv`, `ruff`, pytest
 
